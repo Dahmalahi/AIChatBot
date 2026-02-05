@@ -5,7 +5,6 @@
 
 **AI Chatbot for feature phones** - A Grok-powered coding assistant running on Nokia/Sony Ericsson devices with physical keypads. Works offline with ASCII art generation and full T9 input support.
 
-https://github.com/user-attachments/assets/8b8e9b9f-5c3d-4f5a-9b1a-3e3c3e3c3e3c
 
 ## ✨ Features
 
