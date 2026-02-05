@@ -2,6 +2,7 @@
 
 [![J2ME](https://img.shields.io/badge/Platform-J2ME_CLDC1.1%2FMIDP2.0-blue?logo=java&logoColor=yellow)](https://en.wikipedia.org/wiki/Java_Platform,_Micro_Edition)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+![86997d2f-5108-4d05-9db2-6ce5b4c44665](https://github.com/user-attachments/assets/3dd8d5b1-157d-435a-ac12-0b6e9e597131)
 
 **AI Chatbot for feature phones** - A Grok-powered coding assistant running on Nokia/Sony Ericsson devices with physical keypads. Works offline with ASCII art generation and full T9 input support.
 
