@@ -1,13 +1,12 @@
 # AIChatBot-J2ME 📱
+**AI Chatbot for feature phones** - A Grok-powered coding assistant running on Nokia/Sony Ericsson devices with physical keypads. Works offline with ASCII art generation and full T9 input support.
 
 [![J2ME](https://img.shields.io/badge/Platform-J2ME_CLDC1.1%2FMIDP2.0-blue?logo=java&logoColor=yellow)](https://en.wikipedia.org/wiki/Java_Platform,_Micro_Edition)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+
+
 ![86997d2f-5108-4d05-9db2-6ce5b4c44665 (4)](https://github.com/user-attachments/assets/eba6d160-03b4-45ac-b9d7-132a62998000)
-
-
-
-**AI Chatbot for feature phones** - A Grok-powered coding assistant running on Nokia/Sony Ericsson devices with physical keypads. Works offline with ASCII art generation and full T9 input support.
-
 
 ## ✨ Features
 
