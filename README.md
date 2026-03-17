@@ -1,6 +1,10 @@
-# AIChatBot-J2ME 📱
-**AI Chatbot for feature phones** - A Grok-powered coding assistant running on Nokia/Sony Ericsson devices with physical keypads. Works offline with ASCII art generation and full T9 input support.
+# AI ChatBot v1.1 – Complete Documentation
 
+## 📱 Overview
+
+**AI ChatBot v1.1** is an AI-powered chat application built for J2ME (Java 2 Micro Edition) phones. It delivers a smooth messaging experience with an optimized T9 input system and a virtual QWERTY keyboard.
+
+---
 [![J2ME](https://img.shields.io/badge/Platform-J2ME_CLDC1.1%2FMIDP2.0-blue?logo=java&logoColor=yellow)](https://en.wikipedia.org/wiki/Java_Platform,_Micro_Edition)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -8,75 +12,289 @@
 
 ![86997d2f-5108-4d05-9db2-6ce5b4c44665 (4)](https://github.com/user-attachments/assets/eba6d160-03b4-45ac-b9d7-132a62998000)
 
-## ✨ Features
+## 🎯 Main Features
 
-- ✅ **True Nokia T9 input** - Standard layout (2=abc, 8=tuv) with 1s timeout
-- ✅ **RSK Backspace** - Right Soft Key deletes characters instantly
-- ✅ **Symbol wheel** - `*` key cycles 30+ programming symbols (`! : ; , < > * $ = ) _ - + ' " & % # / \ ( [ ] { } @ ~ ` ^ |`)
-- ✅ **CAPS toggle** - Single `#` press switches case, double press shows history
-- ✅ **Offline snippets** - 15+ Java ME code examples available without network
-- ✅ **ASCII art** - `/image robot` generates text art (no image decoding needed)
-- ✅ **Network resilient** - 2 retry attempts + timeout handling for GPRS/EDGE
-- ✅ **Memory optimized** - 8KB history limit, RMS compression, no leaks
+### 💬 Smart Chat
 
-## 📱 Supported Devices
+* **Context-aware conversation**: The AI remembers previous messages
+* **Real-time responses**: Loading indicator during processing
+* **Bubble interface**: User messages (right) and AI messages (left)
+* **Smooth scrolling**: Navigate chat history with the D-pad
 
-| Brand | Models | Notes |
-|-------|--------|-------|
-| **Nokia** | 3310 (3G), 5310, 6300, N70, N95 | Full T9 + RSK support |
-| **Sony Ericsson** | K750i, W800i, K800i | Symbol wheel optimized |
-| **Samsung** | E250, X820 | Tested on WTK emulator |
-| **Motorola** | RAZR V3 | Limited to numeric input |
+### ⌨️ Advanced T9 Input System
 
-> 💡 Works on **any device running CLDC 1.1 + MIDP 2.0** (J2ME Polish compatible)
+* **Nokia-style multi-tap**: Press multiple times to change letters
+* **Live preview**: Displays available characters
+* **3 input modes**:
 
-## ⚙️ Installation
+  * `[abc]` – lowercase
+  * `[ABC]` – uppercase
+  * `[123]` – numeric
+* **30+ symbols**: Quick access to special characters
+* **Command history**: Browse last 15 messages
 
-1. Download `AIChatBot.jar`  from [Releases](https://github.com/your-username/AIChatBot-J2ME/releases)
-2. Transfer to phone via:
-   - Bluetooth .jar
-   - USB cable (mass storage mode)
-3. Launch from Applications menu
+### 🖥️ Virtual QWERTY Keyboard
 
-## 🔤 T9 Input Guide
+* **Auto-detection**: Switches to T9 when typing numbers
+* **Directional navigation**: Use D-pad to select keys
+* **Caps mode**: Toggle with `*`
+* **Optimized layout**:
 
-| Key | Sequence | Result | Notes |
-|-----|----------|--------|-------|
-| `2` | 1 press | `a` | Standard Nokia layout |
-| `2` | 2 presses | `b` | |
-| `2` | 3 presses | `c` | |
-| `2` | 4 presses | `2` | Digit after letters |
-| `8` | 1 press | `t` | **Now fully functional** (no scroll conflict) |
-| `8` | 2 presses | `u` | |
-| `8` | 3 presses | `v` | |
-| `8` | 4 presses | `8` | |
-| `*` | Cycle | `!` → `:` → `;` → ... | 30+ symbols for coding |
-| `#` | 1 press | Toggle CAPS | `a` → `A` |
-| `#` | 2 presses (<400ms) | Show history | Last 15 messages |
-| **RSK** | Press | ← Backspace | Right Soft Key (always accessible) |
-| `0` | 2 presses | New line | For code formatting |
+```
+1 2 3 4 5 6 7 8 9 0
+q w e r t y u i o p
+a s d f g h j k l
+z x c v b n m
+[SPACE] [.] [<--]
+```
 
-## 🖼️ Screenshots
+### 🔍 Web Search
 
-| Boot Screen | T9 Input | Symbol Wheel |
-|-------------|----------|--------------|
-| ![Boot](docs/SCREENSHOTS/boot_screen.png) | ![T9](docs/SCREENSHOTS/t9_input.png) | ![Symbols](docs/SCREENSHOTS/symbols_menu.png) |
+* **Direct queries** for real-time topics
+* **Seamless integration** with chat interface
+* **Visual tag**: Results marked with `[Web]`
 
-*(Generate these with WTK 2.5.2 → Device Selector → Take Screenshot)*
+### 📝 History Management
 
-## 🛠️ Build from Source
+* **Auto-save** all conversations
+* **Multiple sessions** support
+* **Chronological display** with timestamps
+* **Quick preview list**
 
-### Requirements
-- Sun Java Wireless Toolkit 2.5.2
-- JDK 8 (for WTK compatibility)
-- Apache Ant 1.10+
+### 💾 Multi-format Export
 
-### Build steps
-```bash
-# Clone repo
-git clone https://github.com/your-username/AIChatBot-J2ME.git
-cd AIChatBot-J2ME
+* **TXT**: Plain text with metadata
+* **PNG**: Simulated image export
+* **RMS**: Native J2ME storage format
 
-# Build with Ant (uses WTK 2.5.2)
-ant clean
-ant build
+### ⚙️ Custom Settings
+
+* **Timeout**: 5–120 seconds (default 30s)
+* **AI context**: Enable/disable memory
+* **Context size**: 1–20 exchanges (default 5)
+* **Persistent settings**
+
+---
+
+## 🎮 Controls Guide
+
+### T9 Mode (Default)
+
+| Key     | Function                   | Description |
+| ------- | -------------------------- | ----------- |
+| **0**   | Space / 0 / New line       |             |
+| **1**   | Punctuation (30+ symbols)  |             |
+| **2–9** | Multi-tap letters          |             |
+| **#**   | Toggle `[abc]` / `[ABC]`   |             |
+| *****   | Toggle `[abc]` / `[123]`   |             |
+| ******  | Double press → QWERTY mode |             |
+
+### Navigation
+
+| Action    | Function         |
+| --------- | ---------------- |
+| D-pad ↑/↓ | Scroll messages  |
+| D-pad ←/→ | Browse history   |
+| Fire (5)  | Send message     |
+| LSK       | Open menu        |
+| RSK       | Delete character |
+
+### QWERTY Mode
+
+| Action | Function                   |
+| ------ | -------------------------- |
+| D-pad  | Navigate keyboard          |
+| Fire   | Select key                 |
+| *      | Toggle caps                |
+| #      | Return to T9               |
+| 0–9    | Auto-switch to T9 + number |
+
+---
+
+## 📋 Menu Structure
+
+### Main Menu
+
+```
+AI ChatBot v1.1
+1. New Chat
+2. History
+3. Settings
+4. About
+5. Exit
+User ID: USRxxxx
+```
+
+### Context Menu (LSK)
+
+```
+Send
+Search
+Clear
+Save
+New
+Back
+```
+
+---
+
+## 🎨 User Interface
+
+* Chat bubbles (AI left, user right)
+* Input field with live T9 preview
+* Visual indicators:
+
+  * `[abc]`, `[ABC]`, `[123]`, `QW`
+  * `●●●●` = AI loading
+  * `_` = cursor
+
+---
+
+## 🔧 Advanced Features
+
+### Context System
+
+AI remembers previous exchanges for better answers.
+
+### Command History
+
+Use ← / → to browse last 15 messages.
+
+### Real-time T9 Preview
+
+Shows current character selection while typing.
+
+### Auto-commit
+
+Character is confirmed:
+
+* After 800ms
+* On key change
+* On send
+* On navigation
+
+---
+
+## 💾 Save Formats
+
+* **TXT**: Full readable chat log
+* **PNG**: Simulated export format
+* **RMS**: Native structured storage
+
+---
+
+## 📊 Technical Specs
+
+* **Platform**: CLDC 1.1 / MIDP 2.0
+* **Encoding**: CP1252 (no emojis)
+* **Screen support**: 128×160 → 240×320+ (adaptive)
+
+### Architecture
+
+* MIDlet main app
+* Canvas-based UI screens
+* RMS storage system
+* Network API handler
+
+### API
+
+* Endpoint: `/api/ai/chatgpt`
+* Method: GET
+* Param: `text`
+* Response: JSON (`result`, `answer`, etc.)
+
+---
+
+## 🎨 Color Theme (Matrix)
+
+* Dark green background
+* Bright green text
+* Cyan-green user messages
+* Low-light borders and accents
+
+---
+
+## 🚀 Quick Start
+
+1. Launch app
+2. Select **New Chat**
+3. Type message (T9 or QWERTY)
+4. Press **5 (Fire)** to send
+5. Continue chatting (context saved automatically)
+
+---
+
+## ❓ FAQ
+
+* **Context memory?** Configurable (1–20 messages)
+* **Offline use?** No (internet required)
+* **History saved?** Yes (RMS storage)
+* **QWERTY battery?** Same as T9
+
+---
+
+## 🐛 Troubleshooting
+
+* **HTTP 403** → Wait and retry
+* **Connection error** → Check network / increase timeout
+* **Weird characters** → Auto-cleaned to `?`
+* **T9 issues** → Wait 800ms between presses
+* **QWERTY not working** → Double press `*` quickly
+
+---
+
+## 📝 Version Notes
+
+### v1.1
+
+* Full T9 system
+* Virtual QWERTY
+* Chat history + context
+* Export formats
+* Web search
+* Small screen support
+
+### Future (v1.2+)
+
+* Predictive T9
+* Custom themes
+* Shortcuts
+* Draft mode
+* Multi-language
+
+---
+
+## 👨‍💻 Developer Info
+
+### Files
+
+* AIChatBot.java
+* Utils.java
+* History.java
+* Settings.java
+* SaveManager.java
+
+### Extend
+
+* Add menu commands
+* Customize T9 mapping
+* Add new export formats
+
+---
+
+## 📄 License
+
+Open-source J2ME application
+Encoding: CP1252
+API: ChatGPT (Workers API)
+
+© 2024 AI ChatBot Project
+
+---
+
+## 📞 Support
+
+* Version: v1.1
+* Platform: J2ME (CLDC 1.1 / MIDP 2.0)
+
+**Status:** Stable ✅
