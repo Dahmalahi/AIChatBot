@@ -1,7 +1,7 @@
 # AI ChatBot 
 ## 📱 Overview
 
-**AI ChatBot ** is an AI-powered chat application built for J2ME (Java 2 Micro Edition) phones. It delivers a smooth messaging experience with an optimized T9 input system and a virtual QWERTY keyboard.
+**AI ChatBot** is an AI-powered chat application built for J2ME (Java 2 Micro Edition) phones. It delivers a smooth messaging experience with an optimized T9 input system and a virtual QWERTY keyboard.
 
 ---
 [![J2ME](https://img.shields.io/badge/Platform-J2ME_CLDC1.1%2FMIDP2.0-blue?logo=java&logoColor=yellow)](https://en.wikipedia.org/wiki/Java_Platform,_Micro_Edition)
