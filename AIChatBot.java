@@ -1,55 +1,118 @@
 import javax.microedition.midlet.*;
 import javax.microedition.lcdui.*;
-import javax.microedition.io.*;
-import javax.microedition.rms.*;
-import java.io.*;
-import java.util.*;
+import java.util.Vector;
 
-// ==================== T9Input.java CORRIGÉ ====================
+public class AIChatBot extends MIDlet {
+    private Display display;
+    private ChatCanvas chatCanvas;
+    private MenuScreen menuScreen;
+    private SettingsScreen settingsScreen;
+    private HistoryScreen historyScreen;
+    private AboutScreen aboutScreen;
+    
+    private String userId;
+    private History history;
+    private Settings settings;
+    private SaveManager saveManager;
+    
+    public static final String VERSION = "v1.1";
+    public static final String APP_NAME = "AI ChatBot";
+    
+    public AIChatBot() {
+        display = Display.getDisplay(this);
+        userId = Utils.generateUserId();
+        history = new History();
+        settings = new Settings();
+        saveManager = new SaveManager();
+    }
+    
+    protected void startApp() throws MIDletStateChangeException {
+        showMenu();
+    }
+    
+    public void showMenu() {
+        menuScreen = new MenuScreen(this);
+        display.setCurrent(menuScreen);
+    }
+    
+    public void showChat() {
+        chatCanvas = new ChatCanvas(this);
+        display.setCurrent(chatCanvas);
+    }
+    
+    public void showSettings() {
+        settingsScreen = new SettingsScreen(this);
+        display.setCurrent(settingsScreen);
+    }
+    
+    public void showHistory() {
+        historyScreen = new HistoryScreen(this);
+        display.setCurrent(historyScreen);
+    }
+    
+    public void showAbout() {
+        aboutScreen = new AboutScreen(this);
+        display.setCurrent(aboutScreen);
+    }
+    
+    public void exitApp() {
+        history.saveCurrentSession();
+        destroyApp(true);
+        notifyDestroyed();
+    }
+    
+    public String getUserId() { return userId; }
+    public History getHistory() { return history; }
+    public Settings getSettings() { return settings; }
+    public SaveManager getSaveManager() { return saveManager; }
+    public Display getDisplay() { return display; }
+    
+    protected void pauseApp() {}
+    protected void destroyApp(boolean unconditional) {}
+}
+
+/**
+ * T9Input - Multi-tap text input for J2ME
+ */
 class T9Input {
-    private StringBuffer buffer = new StringBuffer();
-    private String currentDraft = "";
+    private StringBuffer buffer = new StringBuffer(256);
     private int lastKey = -1;
     private int tapCount = 0;
-    private Timer timer = new Timer();
-    private TimerTask timeoutTask;
+    private char draft = 0;
+    
     private boolean upperCase = false;
+    private boolean numericMode = false;
     
-    private static final String[] LOWER_MAP = {
-        " 0",        // 0 = espace + '0'
-        ".,!?1",     // 1 = . , ! ? 1
-        "abc2",      // 2 = a b c 2
-        "def3",      // 3 = d e f 3
-        "ghi4",      // 4 = g h i 4
-        "jkl5",      // 5 = j k l 5
-        "mno6",      // 6 = m n o 6
-        "pqrs7",     // 7 = p q r s 7
-        "tuv8",      // 8 = t u v 8
-        "wxyz9"      // 9 = w x y z 9
-    };
+    private static final int MAX_HISTORY = 15;
+    private Vector history = new Vector();
+    private int historyIndex = -1;
     
-    private static final String[] UPPER_MAP = {
+    private static final String[] MAP_LOWER = {
         " 0",
-        ".,!?1",
-        "ABC2",
-        "DEF3",
-        "GHI4",
-        "JKL5",
-        "MNO6",
-        "PQRS7",
-        "TUV8",
-        "WXYZ9"
+        ".,!?&'()-_:;/@#=+*%$1",
+        "abc2",
+        "def3",
+        "ghi4",
+        "jkl5",
+        "mno6",
+        "pqrs7",
+        "tuv8",
+        "wxyz9"
     };
     
-    public T9Input() {
-        buffer = new StringBuffer();
-    }
+    public T9Input() {}
     
     public void keyPressed(int key) {
         if (key < 0 || key > 9) return;
         
-        if (key != lastKey && lastKey != -1) {
-            commitCharacter();
+        if (numericMode) {
+            if (draft != 0) commitDraft();
+            buffer.append((char)('0' + key));
+            return;
+        }
+        
+        if (key != lastKey && draft != 0) {
+            commitDraft();
         }
         
         if (key == lastKey) {
@@ -59,1241 +122,1199 @@ class T9Input {
             tapCount = 0;
         }
         
-        String options = upperCase ? UPPER_MAP[key] : LOWER_MAP[key];
-        char selected = options.charAt(tapCount % options.length());
-        currentDraft = String.valueOf(selected);
-        resetTimer();
+        String options = MAP_LOWER[key];
+        char c = options.charAt(tapCount % options.length());
+        if (upperCase) c = Character.toUpperCase(c);
+        draft = c;
     }
     
-    private void commitCharacter() {
-        if (currentDraft.length() > 0) {
-            buffer.append(currentDraft);
-            currentDraft = "";
+    public void flush() { commitDraft(); }
+    
+    private void commitDraft() {
+        if (draft != 0) {
+            buffer.append(draft);
+            draft = 0;
             lastKey = -1;
             tapCount = 0;
         }
-    }
-    
-    private void resetTimer() {
-        if (timeoutTask != null) {
-            timeoutTask.cancel();
-        }
-        timeoutTask = new TimerTask() {
-            public void run() {
-                commitCharacter();
-            }
-        };
-        timer.schedule(timeoutTask, 1000);
-    }
-    
-    public String getText() {
-        return buffer.toString() + currentDraft;
     }
     
     public void backspace() {
-        if (currentDraft.length() > 0) {
-            currentDraft = "";
+        if (draft != 0) {
+            draft = 0;
             lastKey = -1;
             tapCount = 0;
         } else if (buffer.length() > 0) {
-            buffer.setLength(buffer.length() - 1);
+            buffer.deleteCharAt(buffer.length() - 1);
         }
     }
+    
+    public String getLiveText() {
+        if (draft != 0) return buffer.toString() + draft;
+        return buffer.toString();
+    }
+    
+    public String getText() { return buffer.toString(); }
     
     public void clear() {
         buffer.setLength(0);
-        currentDraft = "";
+        draft = 0;
         lastKey = -1;
         tapCount = 0;
-        if (timeoutTask != null) timeoutTask.cancel();
-    }
-    
-    public void toggleCase() {
-        commitCharacter();
-        upperCase = !upperCase;
-    }
-    
-    public boolean isUpperCase() {
-        return upperCase;
-    }
-    
-    public void flush() {
-        commitCharacter();
     }
     
     public void setText(String text) {
-        clear();
-        buffer.append(text);
+        commitDraft();
+        buffer.setLength(0);
+        if (text != null) buffer.append(text);
+        lastKey = -1;
+        tapCount = 0;
     }
+    
+    public void toggleCase() {
+        commitDraft();
+        upperCase = !upperCase;
+    }
+    
+    public boolean isUpperCase() { return upperCase; }
+    
+    public void toggleNumericMode() {
+        commitDraft();
+        numericMode = !numericMode;
+    }
+    
+    public boolean isNumericMode() { return numericMode; }
+    
+    public String getModeLabel() {
+        if (numericMode) return "[123]";
+        if (upperCase) return "[ABC]";
+        return "[abc]";
+    }
+    
+    public String getCurrentOptions() {
+        if (lastKey < 0 || lastKey > 9) return "";
+        if (numericMode) return String.valueOf(lastKey);
+        return MAP_LOWER[lastKey];
+    }
+    
+    public int getCurrentOptionIndex() {
+        if (lastKey < 0 || lastKey > 9) return 0;
+        String options = MAP_LOWER[lastKey];
+        return tapCount % options.length();
+    }
+    
+    public boolean hasDraft() { return draft != 0; }
+    public char getDraft() { return draft; }
+    
+    public void addToHistory(String text) {
+        if (text == null || text.trim().length() == 0) return;
+        if (history.size() > 0 && history.elementAt(history.size() - 1).equals(text)) return;
+        history.addElement(text);
+        if (history.size() > MAX_HISTORY) history.removeElementAt(0);
+        historyIndex = history.size();
+    }
+    
+    public String historyUp() {
+        if (history.size() == 0) return null;
+        historyIndex--;
+        if (historyIndex < 0) historyIndex = 0;
+        return (String) history.elementAt(historyIndex);
+    }
+    
+    public String historyDown() {
+        if (history.size() == 0) return null;
+        historyIndex++;
+        if (historyIndex >= history.size()) {
+            historyIndex = history.size();
+            return "";
+        }
+        return (String) history.elementAt(historyIndex);
+    }
+    
+    public void resetHistoryIndex() { historyIndex = history.size(); }
+    public Vector getHistory() { return history; }
 }
-// ============================================================
 
-class BootScreen extends Canvas {
-    private Display display;
-    private Timer timer;
-    private int phase = 0;
-    private final String[] SPLASH_TEXT = {
-        "Grok AI", 
-        "Coder Assistant", 
-        "Loading...", 
-        "Ready!"
-    };
-    private final int[] SPLASH_DELAY = {1200, 1000, 1500, 500};
+// Menu Screen
+class MenuScreen extends Canvas {
     private AIChatBot midlet;
-    private boolean completed = false;
-
-    public BootScreen(Display display, AIChatBot midlet) {
-        this.display = display;
+    private int selected = 0;
+    private String[] items = {"Chat", "Historique", "Parametres", "A propos", "Quitter"};
+    
+    public MenuScreen(AIChatBot midlet) {
         this.midlet = midlet;
         setFullScreenMode(true);
     }
-
+    
     protected void paint(Graphics g) {
-        int width = getWidth();
-        int height = getHeight();
+        int w = getWidth();
+        int h = getHeight();
+        boolean small = (w < 180);
         
-        for (int y = 0; y < height; y++) {
-            int gray = 220 - (y * 120 / height);
-            g.setColor(gray, gray, gray);
-            g.drawLine(0, y, width, y);
-        }
+        Font font = Font.getFont(Font.FACE_MONOSPACE, Font.STYLE_PLAIN, Font.SIZE_SMALL);
+        int fontH = font.getHeight();
         
-        g.setColor(0x000088);
-        g.setFont(Font.getFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE));
+        g.setColor(Utils.COLOR_BG);
+        g.fillRect(0, 0, w, h);
         
-        if (phase < 3) {
-            String dots = "";
-            for (int i = 0; i < (phase * 2) % 4; i++) dots += ".";
-            g.drawString(SPLASH_TEXT[phase] + dots, width/2, height/2 - 20, 
-                        Graphics.TOP | Graphics.HCENTER);
-            
-            int barWidth = width - 40;
-            int progress = (phase + 1) * barWidth / 4;
-            g.setColor(0xDDDDDD);
-            g.drawRect(20, height/2 + 10, barWidth, 8);
-            g.setColor(0x008800);
-            g.fillRect(21, height/2 + 11, progress, 6);
-        } else {
-            g.setColor(0x0000AA);
-            g.drawString("GROK", width/2, height/2 - 30, Graphics.TOP | Graphics.HCENTER);
-            g.setColor(0x000088);
-            g.setFont(Font.getDefaultFont());
-            g.drawString("Coder Assistant", width/2, height/2 - 10, Graphics.TOP | Graphics.HCENTER);
-            g.setColor(0x555555);
-            g.drawString("v1.0 - J2ME Edition", width/2, height/2 + 10, Graphics.TOP | Graphics.HCENTER);
-            g.drawString("2=abc 8=tuv  RSK=Del", width/2, height/2 + 25, Graphics.TOP | Graphics.HCENTER);
-        }
-    }
-
-    public void start() {
-        if (timer != null) timer.cancel();
-        timer = new Timer();
-        timer.schedule(new TimerTask() {
-            public void run() {
-                phase++;
-                if (phase < SPLASH_DELAY.length) {
-                    repaint();
-                    timer.schedule(new TimerTask() {
-                        public void run() {
-                            if (!completed) start();
-                        }
-                    }, SPLASH_DELAY[phase-1]);
-                } else {
-                    completed = true;
-                    display.setCurrent(midlet.getMainDisplayable());
-                }
+        int headerH = small ? 16 : 22;
+        g.setColor(Utils.COLOR_ACCENT);
+        g.fillRect(0, 0, w, headerH);
+        g.setColor(Utils.COLOR_BG);
+        g.setFont(font);
+        g.drawString(AIChatBot.APP_NAME + " " + AIChatBot.VERSION, w/2, 2, 
+                     Graphics.TOP | Graphics.HCENTER);
+        
+        int startY = headerH + 10;
+        int itemH = fontH + 6;
+        
+        for (int i = 0; i < items.length; i++) {
+            int y = startY + (i * itemH);
+            if (i == selected) {
+                g.setColor(Utils.COLOR_HI);
+                g.fillRect(4, y - 2, w - 8, itemH);
+                g.setColor(Utils.COLOR_ACCENT);
+                g.drawString("> " + items[i], 8, y, Graphics.TOP | Graphics.LEFT);
+            } else {
+                g.setColor(Utils.COLOR_TEXT);
+                g.drawString("  " + items[i], 8, y, Graphics.TOP | Graphics.LEFT);
             }
-        }, SPLASH_DELAY[0]);
+        }
+        
+        g.setColor(Utils.COLOR_DIM);
+        g.drawString("ID: " + midlet.getUserId(), 4, h - 28, Graphics.TOP | Graphics.LEFT);
+        
+        int softH = small ? 12 : 14;
+        g.setColor(Utils.COLOR_ACCENT);
+        g.fillRect(0, h - softH, w, softH);
+        g.setColor(Utils.COLOR_BG);
+        g.drawString("OK", w/2, h - softH + 1, Graphics.TOP | Graphics.HCENTER);
     }
-
-    public void stop() {
-        if (timer != null) timer.cancel();
-        timer = null;
+    
+    protected void keyPressed(int keyCode) {
+        int action = getGameAction(keyCode);
+        
+        if (action == UP) {
+            selected = (selected - 1 + items.length) % items.length;
+        } else if (action == DOWN) {
+            selected = (selected + 1) % items.length;
+        } else if (action == FIRE) {
+            switch (selected) {
+                case 0: midlet.showChat(); break;
+                case 1: midlet.showHistory(); break;
+                case 2: midlet.showSettings(); break;
+                case 3: midlet.showAbout(); break;
+                case 4: midlet.exitApp(); break;
+            }
+        }
+        repaint();
     }
 }
 
-public class AIChatBot extends MIDlet implements CommandListener {
-    private Display display;
-    private BootScreen bootScreen;
-    private TextBox nameBox;
-    private Command sendCommand;
-    private Command saveCommand;
-    private Command clearCommand;
-    private Command exitCommand;
-    private Command okCommand;
-    private String session = null;
-    private String userName = "User";
-    private final String baseUrl = "https://apidl.asepharyana.tech/api/ai/chatgpt?text=";
-    private final String asciiApiUrl = "https://api.ascii-art.io/generate?text=";
-    private final String instructions = " Answer in English and act as Coder Assistant. Keep answers concise.";
-    private ChatCanvas canvas;
-    private boolean isWaitingResponse = false;
-    private boolean debugMode = false;
-    private StringBuffer debugLog = new StringBuffer();
-    private long lastNetworkCheck = 0;
-    private boolean networkAvailable = true;
-    private Displayable mainDisplayable = null;
-
-    public void startApp() {
-        display = Display.getDisplay(this);
-        bootScreen = new BootScreen(display, this);
-        display.setCurrent(bootScreen);
-        bootScreen.start();
-        
-        new Thread(new Runnable() {
-            public void run() {
-                loadUserName();
-                loadChatSilent();
-                checkNetworkAsync();
-            }
-        }).start();
-    }
-
-    private void loadChatSilent() {
-        RecordStore rs = null;
-        try {
-            rs = RecordStore.openRecordStore("ChatHistory", false);
-            if (rs.getNumRecords() > 0) {
-                byte[] data = rs.getRecord(1);
-                String savedChat = new String(data, "UTF-8");
-                savedChat = replaceString(savedChat, "G:", "Grok: ");
-                savedChat = replaceString(savedChat, "U:", userName + ": ");
-                if (canvas != null) canvas.setChatHistory(savedChat);
-                else mainDisplayable = createMainDisplayable(savedChat);
-            } else mainDisplayable = createMainDisplayable(null);
-        } catch (Exception e) {} finally {
-            if (rs != null) try { rs.closeRecordStore(); } catch (Exception ignored) {}
-        }
-    }
-
-    private Displayable createMainDisplayable(String history) {
-        if (userName.equals("User")) {
-            showNamePrompt();
-            return nameBox;
-        } else {
-            canvas = new ChatCanvas(this);
-            if (history != null) canvas.setChatHistory(history);
-            else canvas.showWelcome();
-            return canvas;
-        }
-    }
-
-    public Displayable getMainDisplayable() {
-        if (mainDisplayable == null) mainDisplayable = createMainDisplayable(null);
-        return mainDisplayable;
-    }
-
-    private void showNamePrompt() {
-        okCommand = new Command("OK", Command.OK, 1);
-        exitCommand = new Command("Exit", Command.EXIT, 2);
-        nameBox = new TextBox("Enter Your Name", "", 30, TextField.ANY);
-        nameBox.addCommand(okCommand);
-        nameBox.addCommand(exitCommand);
-        nameBox.setCommandListener(this);
-    }
-
-    private void initChat() {
-        canvas = new ChatCanvas(this);
-        display.setCurrent(canvas);
-        canvas.showWelcome();
-    }
-
-    public void pauseApp() {
-        if (bootScreen != null) bootScreen.stop();
-    }
-
-    public void destroyApp(boolean unconditional) {
-        if (bootScreen != null) bootScreen.stop();
-        if (canvas != null) canvas.stopTimers();
-        notifyDestroyed();
-    }
-
-    public void commandAction(Command c, Displayable d) {
-        if (c == exitCommand) destroyApp(true);
-        else if (c == sendCommand && !isWaitingResponse && canvas != null) canvas.sendInput();
-        else if (c == saveCommand && canvas != null) saveChat();
-        else if (c == clearCommand && canvas != null) canvas.clearChat();
-        else if (c == okCommand && d == nameBox) {
-            String rawName = nameBox.getString().trim();
-            if (rawName.equals("debug123")) {
-                debugMode = !debugMode;
-                if (canvas != null) canvas.showStatus(debugMode ? "DEBUG ON" : "DEBUG OFF");
-                logDebug("Debug mode toggled: " + debugMode);
-                return;
-            }
-            if (rawName.length() == 0 || rawName.length() > 30) userName = "User";
-            else userName = rawName;
-            saveUserName();
-            initChat();
-        }
-    }
-
-    private void loadUserName() {
-        RecordStore rs = null;
-        try {
-            rs = RecordStore.openRecordStore("UserName", false);
-            if (rs.getNumRecords() > 0) {
-                byte[] data = rs.getRecord(1);
-                userName = new String(data, "UTF-8");
-                if (userName.length() > 30) userName = "User";
-            }
-        } catch (Exception e) {} finally {
-            if (rs != null) try { rs.closeRecordStore(); } catch (Exception ignored) {}
-        }
-    }
-
-    private void saveUserName() {
-        RecordStore rs = null;
-        try {
-            rs = RecordStore.openRecordStore("UserName", true);
-            byte[] data = userName.getBytes("UTF-8");
-            if (rs.getNumRecords() == 0) rs.addRecord(data, 0, data.length);
-            else rs.setRecord(1, data, 0, data.length);
-        } catch (Exception e) {} finally {
-            if (rs != null) try { rs.closeRecordStore(); } catch (Exception ignored) {}
-        }
-    }
-
-    void saveChat() {
-        if (canvas == null) return;
-        RecordStore rs = null;
-        try {
-            String history = canvas.getChatHistory();
-            history = replaceString(history, "\n\n", "\n");
-            history = replaceString(history, "Grok: ", "G:");
-            history = replaceString(history, userName + ": ", "U:");
-            if (history.length() > 8000) history = substringFrom(history, history.length() - 8000);
-            
-            rs = RecordStore.openRecordStore("ChatHistory", true);
-            byte[] data = history.getBytes("UTF-8");
-            if (rs.getNumRecords() == 0) rs.addRecord(data, 0, data.length);
-            else rs.setRecord(1, data, 0, data.length);
-            if (canvas != null) canvas.showStatus("Saved");
-            logDebug("RMS saved " + data.length + " bytes");
-        } catch (Exception e) {
-            if (canvas != null) canvas.showStatus("Save failed");
-            logDebug("RMS error: " + e.toString());
-        } finally {
-            if (rs != null) try { rs.closeRecordStore(); } catch (Exception ignored) {}
-        }
-    }
-
-    private void loadChat() {
-        if (canvas == null) return;
-        RecordStore rs = null;
-        try {
-            rs = RecordStore.openRecordStore("ChatHistory", false);
-            if (rs.getNumRecords() > 0) {
-                byte[] data = rs.getRecord(1);
-                String savedChat = new String(data, "UTF-8");
-                savedChat = replaceString(savedChat, "G:", "Grok: ");
-                savedChat = replaceString(savedChat, "U:", userName + ": ");
-                canvas.setChatHistory(savedChat);
-            }
-        } catch (Exception e) {
-            canvas.appendToChat("System: Load failed.\n");
-        } finally {
-            if (rs != null) try { rs.closeRecordStore(); } catch (Exception ignored) {}
-        }
-    }
-
-    private String replaceString(String s, String target, String replacement) {
-        if (s == null || target == null || replacement == null || target.length() == 0) return s;
-        StringBuffer result = new StringBuffer();
-        int start = 0;
-        int pos;
-        while ((pos = indexOf(s, target, start)) != -1) {
-            result.append(substring(s, start, pos));
-            result.append(replacement);
-            start = pos + target.length();
-        }
-        result.append(substringFrom(s, start));
-        return result.toString();
-    }
-    
-    private int indexOf(String s, String target, int fromIndex) {
-        if (fromIndex < 0) fromIndex = 0;
-        int max = s.length() - target.length();
-        if (max < 0) return -1;
-        char first = target.charAt(0);
-        for (int i = fromIndex; i <= max; i++) {
-            if (s.charAt(i) == first) {
-                int j = 1;
-                while (j < target.length() && s.charAt(i+j) == target.charAt(j)) j++;
-                if (j == target.length()) return i;
-            }
-        }
-        return -1;
-    }
-    
-    private String substring(String s, int start, int end) {
-        if (start < 0) start = 0;
-        if (end > s.length()) end = s.length();
-        if (start >= end) return "";
-        char[] buf = new char[end - start];
-        for (int i = 0; i < buf.length; i++) buf[i] = s.charAt(start + i);
-        return new String(buf);
-    }
-    
-    private String substringFrom(String s, int start) {
-        return substring(s, start, s.length());
-    }
-
-    private void checkNetworkAsync() {
-        new Thread(new Runnable() {
-            public void run() {
-                final boolean available = isNetworkAvailableImpl();
-                getDisplay().callSerially(new Runnable() {
-                    public void run() {
-                        networkAvailable = available;
-                        if (canvas != null) canvas.repaint();
-                    }
-                });
-            }
-        }).start();
-    }
-
-    private boolean isNetworkAvailableImpl() {
-        if (System.currentTimeMillis() - lastNetworkCheck < 30000) return networkAvailable;
-        lastNetworkCheck = System.currentTimeMillis();
-        try {
-            HttpConnection c = (HttpConnection)Connector.open("http://connectivitycheck.platform.hicloud.com/generate_204", Connector.READ, true);
-            c.setRequestProperty("Connection", "close");
-            int rc = c.getResponseCode();
-            c.close();
-            return (rc == 204 || rc == 200);
-        } catch (Exception e) { return false; }
-    }
-
-    static final String[][] OFFLINE_SNIPPETS = {
-        {"hello", "Welcome! Ask me about:\n- Java ME loops\n- RMS storage\n- HTTP connections\n- Canvas drawing\n- Threading basics\n- /image commands\n- T9: 2=abc 3=def...\n- #=Caps  *=Symbols"},
-        {"loop", "for(int i=0;i<10;i++){\n  // iteration\n}\n\nwhile(cond){\n  // repeat\n}"},
-        {"array", "// Fixed size\nint[] a = new int[5];\na[0] = 1;\n\n// Access\nint x = a[0];"},
-        {"string", "String s = \"text\";\nint len = s.length();\nchar c = s.charAt(0);\nboolean eq = s.equals(\"text\");"},
-        {"rms", "// Open\nRecordStore rs = RecordStore.openRecordStore(\"db\",true);\n\n// Write\nbyte[] d = \"data\".getBytes();\nrs.addRecord(d,0,d.length);\n\n// Close\nrs.closeRecordStore();"},
-        {"canvas", "class MyCanvas extends Canvas {\n  protected void paint(Graphics g) {\n    g.drawString(\"Hi\",10,10,0);\n  }\n}"},
-        {"http", "HttpConnection c = (HttpConnection)Connector.open(url);\nc.setRequestMethod(\"GET\");\nInputStream i = c.openInputStream();\n// Read data...\nc.close();"},
-        {"thread", "new Thread(new Runnable(){\n  public void run(){\n    // Background task\n  }\n}).start();"},
-        {"list", "List menu = new List(\"Menu\",List.IMPLICIT);\nmenu.append(\"Item1\",null);\nmenu.append(\"Item2\",null);"},
-        {"alert", "Alert a = new Alert(\"Title\",\"Msg\",null,AlertType.INFO);\na.setTimeout(3000);\ndisplay.setCurrent(a);"},
-        {"key", "// In Canvas:\nprotected void keyPressed(int k){\n  // 2/8 for T9 letters\n  // RSK for backspace\n  // * for symbols\n  // # for CAPS\n}"},
-        {"gfx", "Graphics g = image.getGraphics();\ng.setColor(255,0,0);\ng.fillRect(10,10,50,30);\ng.setColor(0,0,0);\ng.drawString(\"Text\",20,20,0);"},
-        {"help", "T9 Layout (Nokia/SE):\n1=.,!? 2=abc 3=def\n4=ghi 5=jkl 6=mno\n7=pqrs 8=tuv 9=wxyz\n0=space *=symbols #=caps\nRSK=Backspace"},
-        {"java", "J2ME = CLDC 1.1 + MIDP 2.0\n✓ No generics\n✓ No enums\n✓ No StringBuilder\n✓ Max JAR: 512KB\n✓ Max heap: 512KB"},
-        {"tips", "J2ME Tips:\n✓ Reuse objects\n✓ Avoid String concat\n✓ Close streams ALWAYS\n✓ Limit RMS records\n✓ Use byte arrays"},
-        {"image", "Use /image <description> for ASCII art:\n/image robot\n/image heart\n/image star\n/image house\n/image tree"},
-        {"symbol", "Press * repeatedly for symbols:\n! : ; , < > * $ = ) _ - + '\" & % # /"},
-        {"history", "Double-press # to view history\nSingle press # = toggle CAPS"}
-    };
-
-    String getOfflineResponse(String input) {
-        String lower = input.toLowerCase();
-        for (int i = 0; i < OFFLINE_SNIPPETS.length; i++) {
-            if (indexOf(lower, OFFLINE_SNIPPETS[i][0], 0) != -1) {
-                return OFFLINE_SNIPPETS[i][1];
-            }
-        }
-        return null;
-    }
-
-    void logDebug(String msg) {
-        if (!debugMode) return;
-        debugLog.append("[").append(System.currentTimeMillis() % 10000).append("] ").append(msg).append("\n");
-        if (debugLog.length() > 2000) {
-            StringBuffer newLog = new StringBuffer();
-            for (int i = 500; i < debugLog.length(); i++) newLog.append(debugLog.charAt(i));
-            debugLog = newLog;
-        }
-    }
-
-    public String getUserName() { return userName; }
-    public Display getDisplay() { return display; }
-    public String getBaseUrl() { return baseUrl; }
-    public String getAsciiApiUrl() { return asciiApiUrl; }
-    public String getInstructions() { return instructions; }
-    public String getSession() { return session; }
-    public void setSession(String s) { session = s; }
-    public boolean isWaitingResponse() { return isWaitingResponse; }
-    public void setWaiting(boolean waiting) { isWaitingResponse = waiting; }
-    public boolean isDebugMode() { return debugMode; }
-    public StringBuffer getDebugLog() { return debugLog; }
-    boolean isNetworkAvailable() { return networkAvailable; }
-}
-
-class ChatCanvas extends Canvas implements CommandListener {
+// Chat Canvas with Enhanced Save Dialog
+class ChatCanvas extends Canvas implements Runnable {
     private AIChatBot midlet;
-    private StringBuffer chatHistory = new StringBuffer();
-    private T9Input t9Input = new T9Input();
-    private int scrollY = 0;
-    private Timer cursorTimer;
-    private boolean showCursor = true;
-    private long lastActivity = System.currentTimeMillis();
-    private boolean cursorActive = true;
-    private long lastSendTime = 0;
-    private Font font;
-    private int lineHeight;
-    private String statusMessage = "";
-    private long statusExpiry = 0;
-    private static final int MAX_HISTORY = 8000;
-    private Vector questionHistory = new Vector();
-    private int historyIndex = -1;
-    private static final char[] HEX_DIGITS = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+    private Vector messages;
+    private T9Input t9;
+    private int scrollOffset = 0;
+    private int maxScroll = 0;
+    private boolean cursorVisible = true;
+    private int frameCount = 0;
+    private boolean isLoading = false;
     
-    // Symboles COMPLETS pour touche *
-    private static final String[] SYMBOLS = {
-        "!", ":", ";", ",", "<", ">", "*", "$", "=", ")", 
-        "_", "-", "+", "'", "\"", "&", "%", "#", "/", "\\",
-        "(", "[", "]", "{", "}", "@", "~", "`", "^", "|"
+    // Menu
+    private boolean showMenu = false;
+    private int menuSelected = 0;
+    private String[] menuItems = {"Envoyer", "Recherche", "Effacer", "Sauver", "Nouveau", "Retour"};
+    
+    // Input modes
+    private static final int MODE_T9 = 0;
+    private static final int MODE_QWERTY = 1;
+    private int inputMode = MODE_T9;
+    
+    // QWERTY keyboard
+    private int qwertyRow = 1;
+    private int qwertyCol = 0;
+    private boolean qwertyShift = false;
+    private static final String[] QWERTY_ROWS = {
+        "1234567890",
+        "qwertyuiop",
+        "asdfghjkl",
+        "zxcvbnm",
+        " .<"
     };
-    private int starTapCount = 0;
-    private int lastSymbolPos = -1;
-    private Timer starTimer = null;
-    private int lastKey = -1;
     
-    // Gestion historique #
-    private boolean lastKeyWasHash = false;
-    private long lastHashPress = 0;
-    private static final long DOUBLE_PRESS_TIMEOUT = 400;
+    // Screen metrics
+    private int scrW, scrH;
+    private boolean isSmall;
+    private Font font;
+    private int fontH;
+    private int headerH, inputH, softH;
     
-    // Commandes avec position soft keys
-    private Command sendCommand;
-    private Command backspaceCommand; // RSK = Right Soft Key
-    private Command exitCommand;      // Menu option
-
+    // Auto-detect timing
+    private long lastNavTime = 0;
+    
     public ChatCanvas(AIChatBot midlet) {
         this.midlet = midlet;
-        this.font = Font.getDefaultFont();
-        this.lineHeight = font.getHeight();
+        this.messages = new Vector();
+        this.t9 = new T9Input();
+        setFullScreenMode(true);
         
-        // LSK (Left Soft Key) = Send
-        sendCommand = new Command("Send", Command.OK, 1);
-        // RSK (Right Soft Key) = Backspace (priorité haute pour position droite)
-        backspaceCommand = new Command("<", Command.BACK, 1);
-        // Exit dans menu
-        exitCommand = new Command("Exit", Command.EXIT, 3);
+        addMessage(false, "Bienvenue! Tapez avec T9.");
+        addMessage(false, "#=MAJ *=Mode LSK=Menu");
         
-        addCommand(sendCommand);
-        addCommand(backspaceCommand);
-        addCommand(exitCommand);
-        setCommandListener(this);
-        startCursorTimer();
+        new Thread(this).start();
     }
-
-    private void startCursorTimer() {
-        if (cursorTimer != null) cursorTimer.cancel();
-        cursorTimer = new Timer();
-        cursorTimer.schedule(new TimerTask() {
-            public void run() {
-                long now = System.currentTimeMillis();
-                if (now - lastActivity > 15000) cursorActive = false;
-                else {
-                    cursorActive = true;
-                    showCursor = !showCursor;
-                }
+    
+    private void calcMetrics() {
+        scrW = getWidth();
+        scrH = getHeight();
+        isSmall = (scrW < 180 || scrH < 220);
+        font = Font.getFont(Font.FACE_MONOSPACE, Font.STYLE_PLAIN, Font.SIZE_SMALL);
+        fontH = font.getHeight();
+        headerH = isSmall ? 14 : 20;
+        inputH = isSmall ? 26 : 34;
+        softH = isSmall ? 12 : 14;
+    }
+    
+    public void run() {
+        while (true) {
+            frameCount++;
+            if (frameCount % 8 == 0) {
+                cursorVisible = !cursorVisible;
                 repaint();
             }
-        }, 0, 400);
+            try { Thread.sleep(60); } catch (Exception e) {}
+        }
     }
-
-    public void showWelcome() {
-        String[] welcomes = {
-            "Grok: Hello " + midlet.getUserName() + "! I'm your Coder Assistant.\nT9 Layout: 2=abc 3=def 4=ghi...\n#=Caps  *=Symbols  RSK=Del\n",
-            "Grok: Hi " + midlet.getUserName() + "! Ready to code?\nTry: 'loop example' or '/image heart'\nT9: Press 2->a 22->b 222->c\nRSK deletes last character\n",
-            "Grok: Welcome " + midlet.getUserName() + "!\nJ2ME questions? I've got answers!\n# = toggle CAPS mode\n* = symbols !:;,<>\nRSK = backspace\n",
-            "Grok: Hey " + midlet.getUserName() + "! Coder\nWhat shall we build today?\nT9: 8->t 88->u 888->v\nRSK erases mistakes\n"
-        };
-        int idx = (int)(System.currentTimeMillis() % welcomes.length);
-        appendToChat(welcomes[idx] + "\n");
-    }
-
-    public void clearChat() {
-        chatHistory.setLength(0);
-        questionHistory.removeAllElements();
-        historyIndex = -1;
-        t9Input.clear();
-        showWelcome();
-        scrollY = 0;
-        repaint();
-    }
-
-    public void setChatHistory(String history) {
-        chatHistory = new StringBuffer(history);
-        scrollY = 32767;
-        repaint();
-    }
-
-    public String getChatHistory() {
-        return chatHistory.toString();
-    }
-
-    public void showStatus(String msg) {
-        statusMessage = msg;
-        statusExpiry = System.currentTimeMillis() + (midlet.isDebugMode() ? 5000 : 2000);
-        repaint();
-    }
-
+    
     protected void paint(Graphics g) {
-        int width = getWidth();
-        int height = getHeight();
-        boolean isSmallScreen = (width <= 130 || height <= 130);
+        calcMetrics();
         
-        g.setColor(0xFFFFFF); g.fillRect(0, 0, width, height);
-        int inputHeight = isSmallScreen ? lineHeight + 2 : lineHeight + 6;
-        int chatHeight = height - inputHeight;
+        g.setColor(Utils.COLOR_BG);
+        g.fillRect(0, 0, scrW, scrH);
+        g.setFont(font);
         
-        g.setClip(0, 0, width, chatHeight);
-        g.translate(0, -scrollY);
-        g.setColor(0x000000);
+        drawHeader(g);
         
-        int y = 4;
-        int textLen = chatHistory.length();
-        int pos = 0;
+        int msgY = headerH;
+        int msgH;
         
-        while (pos < textLen && y < scrollY + chatHeight + 200) {
-            if (y + lineHeight < scrollY - 100) {
-                while (pos < textLen && chatHistory.charAt(pos) != '\n') pos++;
-                if (pos < textLen) pos++;
-                y += lineHeight + 2;
-                continue;
-            }
-            
-            int lineEnd = pos;
-            while (lineEnd < textLen && chatHistory.charAt(lineEnd) != '\n') lineEnd++;
-            
-            String line = "";
-            if (lineEnd > pos) {
-                char[] buf = new char[lineEnd - pos];
-                for (int i = 0; i < buf.length; i++) buf[i] = chatHistory.charAt(pos + i);
-                line = new String(buf);
-            }
-            
-            if (isSmallScreen) {
-                if (startsWith(line, "Grok: ")) line = "G: " + substring(line, 6, line.length());
-                else if (startsWith(line, midlet.getUserName() + ": ")) 
-                    line = "U: " + substring(line, midlet.getUserName().length() + 2, line.length());
-            }
-            
-            y = drawWrappedLine(g, line, 4, y, width - 8);
-            pos = lineEnd + 1;
-            y += (isSmallScreen ? 1 : 2);
-        }
-        
-        if (scrollY == 32767) scrollY = Math.max(0, y - chatHeight);
-        else {
-            if (y < chatHeight) scrollY = 0;
-            else scrollY = Math.min(scrollY, y - chatHeight);
-        }
-        
-        g.translate(0, scrollY);
-        g.setClip(0, 0, width, height);
-        g.setColor(0xDDDDDD); g.drawLine(0, chatHeight - 1, width, chatHeight - 1);
-        
-        g.setColor(0xF0F0FF); g.fillRect(0, chatHeight, width, inputHeight);
-        g.setColor(0x000000); g.drawRect(0, chatHeight, width - 1, inputHeight - 1);
-        
-        String displayText = t9Input.getText();
-        if (t9Input.isUpperCase()) {
-            g.setColor(0xAA0000);
-            g.drawString("[CAPS]", 4, chatHeight + 2, Graphics.TOP | Graphics.LEFT);
-            g.setColor(0x000000);
-            g.drawString(displayText + (cursorActive && showCursor ? "_" : ""), 45, chatHeight + 2, Graphics.TOP | Graphics.LEFT);
+        if (inputMode == MODE_QWERTY) {
+            int kbH = isSmall ? 60 : 80;
+            msgH = scrH - headerH - inputH - kbH - softH;
+            drawMessages(g, msgY, msgH);
+            drawInputBox(g, msgY + msgH);
+            drawQwerty(g, msgY + msgH + inputH, kbH);
         } else {
-            if (cursorActive && showCursor && !midlet.isWaitingResponse()) displayText += "_";
-            else if (midlet.isWaitingResponse()) displayText += "...";
-            g.drawString("You: " + displayText, 4, chatHeight + 2, Graphics.TOP | Graphics.LEFT);
+            msgH = scrH - headerH - inputH - softH;
+            drawMessages(g, msgY, msgH);
+            drawT9Input(g, scrH - inputH - softH);
         }
         
-        int signal = getSignalStrength();
-        int barX = width - 8;
-        for (int i = 0; i < 4; i++) {
-            g.setColor(i < signal ? 0x00AA00 : 0xDDDDDD);
-            g.fillRect(barX - i*3, 4, 2, 6 - i);
-        }
-        if (!midlet.isNetworkAvailable()) {
-            g.setColor(0xAA0000);
-            g.drawString("X", barX - 12, 4, Graphics.TOP | Graphics.LEFT);
-        }
+        drawSoftkeys(g);
         
-        if (statusMessage.length() > 0 && System.currentTimeMillis() < statusExpiry) {
-            g.setColor(0x0000AA);
-            g.drawString(statusMessage, width - 4, 16, Graphics.TOP | Graphics.RIGHT);
-        }
+        if (showMenu) drawMenu(g);
+    }
+    
+    private void drawHeader(Graphics g) {
+        g.setColor(Utils.COLOR_ACCENT);
+        g.fillRect(0, 0, scrW, headerH);
+        g.setColor(Utils.COLOR_BG);
         
-        if (midlet.isDebugMode() && midlet.getDebugLog().length() > 0) {
-            g.setColor(0x880088);
-            StringBuffer log = midlet.getDebugLog();
-            int start = Math.max(0, log.length() - 60);
-            char[] debugChars = new char[log.length() - start];
-            for (int i = 0; i < debugChars.length; i++) debugChars[i] = log.charAt(start + i);
-            g.drawString(new String(debugChars), 2, 2, Graphics.TOP | Graphics.LEFT);
+        String title = isSmall ? "Chat" : "[IA] Chat";
+        g.drawString(title, 3, 1, Graphics.TOP | Graphics.LEFT);
+        
+        String mode = (inputMode == MODE_QWERTY) ? "QW" : t9.getModeLabel();
+        g.drawString(mode, scrW - 3, 1, Graphics.TOP | Graphics.RIGHT);
+        
+        if (isLoading) {
+            g.setColor(Utils.COLOR_TEXT);
+            int cx = scrW / 2;
+            int cy = headerH / 2;
+            int r = 4;
+            for (int i = 0; i < 4; i++) {
+                double a = ((frameCount * 30) + (i * 90)) * Math.PI / 180;
+                int px = cx + (int)(Math.cos(a) * r);
+                int py = cy + (int)(Math.sin(a) * r);
+                g.fillRect(px - 1, py - 1, 2, 2);
+            }
         }
     }
-
-    private int drawWrappedLine(Graphics g, String line, int x, int y, int maxWidth) {
-        if (line.length() == 0) return y + lineHeight;
+    
+    private void drawMessages(Graphics g, int startY, int areaH) {
+        g.setClip(0, startY, scrW, areaH);
+        
+        int pad = isSmall ? 2 : 4;
+        int maxW = scrW - (pad * 2) - 4;
+        int y = startY + pad - scrollOffset;
+        
+        for (int i = 0; i < messages.size(); i++) {
+            String[] msg = (String[]) messages.elementAt(i);
+            boolean isAI = msg[0].equals("AI");
+            String text = msg[1];
+            
+            Vector lines = wrapText(text, maxW - 8);
+            int bubbleH = (lines.size() * fontH) + 4;
+            int bubbleW = getMaxWidth(lines, g) + 10;
+            if (bubbleW > maxW) bubbleW = maxW;
+            
+            if (y + bubbleH >= startY - 20 && y < startY + areaH + 20) {
+                int bx = isAI ? pad : (scrW - bubbleW - pad);
+                
+                g.setColor(isAI ? Utils.COLOR_HI : Utils.COLOR_USER_BG);
+                g.fillRoundRect(bx, y, bubbleW, bubbleH, 4, 4);
+                g.setColor(Utils.COLOR_BORDER);
+                g.drawRoundRect(bx, y, bubbleW, bubbleH, 4, 4);
+                
+                g.setColor(isAI ? Utils.COLOR_TEXT : Utils.COLOR_USER);
+                for (int j = 0; j < lines.size(); j++) {
+                    g.drawString((String)lines.elementAt(j), bx + 4, y + 2 + (j * fontH),
+                                 Graphics.TOP | Graphics.LEFT);
+                }
+            }
+            y += bubbleH + pad;
+        }
+        
+        maxScroll = Math.max(0, y + scrollOffset - startY - areaH);
+        g.setClip(0, 0, scrW, scrH);
+    }
+    
+    private Vector wrapText(String text, int maxW) {
+        Vector lines = new Vector();
+        if (text == null || text.length() == 0) {
+            lines.addElement("");
+            return lines;
+        }
+        
         int start = 0;
-        while (start < line.length()) {
-            int end = start + 1;
-            while (end <= line.length()) {
-                String substr = substring(line, start, end);
-                if (font.stringWidth(substr) > maxWidth) { end--; break; }
+        while (start < text.length()) {
+            int end = start;
+            int lastSp = -1;
+            
+            while (end < text.length()) {
+                char c = text.charAt(end);
+                if (c == '\n') {
+                    lines.addElement(text.substring(start, end));
+                    start = end + 1;
+                    end = start;
+                    lastSp = -1;
+                    continue;
+                }
+                if (c == ' ') lastSp = end;
+                
+                if (font.substringWidth(text, start, end - start + 1) > maxW) {
+                    if (lastSp > start) {
+                        lines.addElement(text.substring(start, lastSp));
+                        start = lastSp + 1;
+                    } else {
+                        lines.addElement(text.substring(start, end));
+                        start = end;
+                    }
+                    end = start;
+                    lastSp = -1;
+                    continue;
+                }
                 end++;
             }
-            end--;
             
-            if (end < line.length() && end > start) {
-                int lastSpace = -1;
-                for (int i = end; i >= start; i--) {
-                    if (line.charAt(i) == ' ') { lastSpace = i; break; }
-                }
-                if (lastSpace > start && lastSpace < end) end = lastSpace;
+            if (start < text.length()) {
+                lines.addElement(text.substring(start));
+                break;
             }
-            
-            String fragment = substring(line, start, end).trim();
-            g.drawString(fragment, x, y, Graphics.TOP | Graphics.LEFT);
-            y += lineHeight;
-            start = end;
-            if (start < line.length() && line.charAt(start) == ' ') start++;
         }
-        return y;
-    }
-
-    private boolean startsWith(String s, String prefix) {
-        if (s.length() < prefix.length()) return false;
-        for (int i = 0; i < prefix.length(); i++) {
-            if (s.charAt(i) != prefix.charAt(i)) return false;
-        }
-        return true;
+        
+        if (lines.size() == 0) lines.addElement("");
+        return lines;
     }
     
-    private String substring(String s, int start, int end) {
-        if (start < 0) start = 0;
-        if (end > s.length()) end = s.length();
-        if (start >= end) return "";
-        char[] buf = new char[end - start];
-        for (int i = 0; i < buf.length; i++) buf[i] = s.charAt(start + i);
-        return new String(buf);
+    private int getMaxWidth(Vector lines, Graphics g) {
+        int max = 0;
+        for (int i = 0; i < lines.size(); i++) {
+            int w = font.stringWidth((String)lines.elementAt(i));
+            if (w > max) max = w;
+        }
+        return max;
     }
-
-    private int getSignalStrength() {
-        try {
-            String sig = System.getProperty("com.sonyericsson.net.signalstrength");
-            if (sig != null) {
-                int val = 0;
-                for (int i = 0; i < sig.length(); i++) {
-                    if (sig.charAt(i) >= '0' && sig.charAt(i) <= '9') val = val * 10 + (sig.charAt(i) - '0');
+    
+    private void drawT9Input(Graphics g, int y) {
+        g.setColor(Utils.COLOR_INPUT_BG);
+        g.fillRect(0, y, scrW, inputH);
+        g.setColor(Utils.COLOR_BORDER);
+        g.drawLine(0, y, scrW, y);
+        
+        String opts = t9.getCurrentOptions();
+        if (opts.length() > 0) {
+            g.setColor(Utils.COLOR_DIM);
+            int optIdx = t9.getCurrentOptionIndex();
+            String preview = "";
+            for (int i = 0; i < opts.length(); i++) {
+                if (i == optIdx) {
+                    preview += "[" + opts.charAt(i) + "]";
+                } else {
+                    preview += " " + opts.charAt(i) + " ";
                 }
-                return Math.min(4, Math.max(0, val / 8));
             }
-        } catch (Exception e) {}
-        return midlet.isNetworkAvailable() ? 3 : 0;
+            g.drawString(preview, 3, y + 1, Graphics.TOP | Graphics.LEFT);
+        }
+        
+        int boxY = y + (isSmall ? 9 : 12);
+        int boxH = fontH + 4;
+        g.setColor(Utils.COLOR_BG);
+        g.fillRect(2, boxY, scrW - 4, boxH);
+        g.setColor(Utils.COLOR_BORDER);
+        g.drawRect(2, boxY, scrW - 4, boxH);
+        
+        String txt = t9.getLiveText();
+        int maxC = (scrW - 16) / font.charWidth('m');
+        if (txt.length() > maxC) txt = txt.substring(txt.length() - maxC);
+        
+        g.setColor(Utils.COLOR_TEXT);
+        g.drawString(txt, 5, boxY + 2, Graphics.TOP | Graphics.LEFT);
+        
+        if (cursorVisible) {
+            int cx = 5 + font.stringWidth(txt);
+            g.setColor(Utils.COLOR_ACCENT);
+            g.fillRect(cx, boxY + 2, 2, fontH);
+        }
+        
+        if (t9.hasDraft()) {
+            g.setColor(Utils.COLOR_ACCENT);
+            int dx = 5 + font.stringWidth(txt) - font.charWidth(t9.getDraft());
+            g.drawLine(dx, boxY + boxH - 2, dx + font.charWidth(t9.getDraft()), boxY + boxH - 2);
+        }
     }
-
-    protected void keyPressed(int keyCode) {
-        lastActivity = System.currentTimeMillis();
-        if (cursorTimer == null) startCursorTimer();
-        if (midlet.isWaitingResponse()) return;
+    
+    private void drawInputBox(Graphics g, int y) {
+        g.setColor(Utils.COLOR_INPUT_BG);
+        g.fillRect(0, y, scrW, inputH);
+        g.setColor(Utils.COLOR_BORDER);
+        g.drawLine(0, y, scrW, y);
         
-        // CORRECTION CRITIQUE : Prioriser les touches numériques AVANT game actions
-        int keyIndex = keyCode - Canvas.KEY_NUM0;
-        if (keyIndex >= 0 && keyIndex <= 9) {
-            t9Input.keyPressed(keyIndex);
-            historyIndex = -1;
-            repaint();
-            return;
+        int boxY = y + 2;
+        int boxH = inputH - 4;
+        g.setColor(Utils.COLOR_BG);
+        g.fillRect(2, boxY, scrW - 4, boxH);
+        g.setColor(Utils.COLOR_BORDER);
+        g.drawRect(2, boxY, scrW - 4, boxH);
+        
+        String txt = t9.getLiveText();
+        int maxC = (scrW - 16) / font.charWidth('m');
+        if (txt.length() > maxC) txt = txt.substring(txt.length() - maxC);
+        
+        g.setColor(Utils.COLOR_TEXT);
+        g.drawString(txt, 5, boxY + 2, Graphics.TOP | Graphics.LEFT);
+        
+        if (cursorVisible) {
+            int cx = 5 + font.stringWidth(txt);
+            g.setColor(Utils.COLOR_ACCENT);
+            g.fillRect(cx, boxY + 2, 2, fontH);
         }
+    }
+    
+    private void drawQwerty(Graphics g, int startY, int kbH) {
+        int rowH = kbH / QWERTY_ROWS.length;
         
-        // Game actions (directionnelles physiques)
-        int gameAction = getGameAction(keyCode);
+        g.setColor(Utils.COLOR_INPUT_BG);
+        g.fillRect(0, startY, scrW, kbH);
         
-        if (gameAction == Canvas.LEFT && questionHistory.size() > 0) {
-            if (historyIndex < questionHistory.size() - 1) {
-                historyIndex++;
-                t9Input.setText((String)questionHistory.elementAt(historyIndex));
-                repaint();
+        for (int r = 0; r < QWERTY_ROWS.length; r++) {
+            String row = QWERTY_ROWS[r];
+            if (qwertyShift && r >= 1 && r <= 3) row = row.toUpperCase();
+            
+            int rowY = startY + (r * rowH);
+            int keyW = scrW / row.length();
+            
+            for (int c = 0; c < row.length(); c++) {
+                int keyX = c * keyW;
+                boolean sel = (r == qwertyRow && c == qwertyCol);
+                
+                if (sel) {
+                    g.setColor(Utils.COLOR_ACCENT);
+                    g.fillRect(keyX + 1, rowY + 1, keyW - 2, rowH - 2);
+                    g.setColor(Utils.COLOR_BG);
+                } else {
+                    g.setColor(Utils.COLOR_HI);
+                    g.fillRect(keyX + 1, rowY + 1, keyW - 2, rowH - 2);
+                    g.setColor(Utils.COLOR_TEXT);
+                }
+                
+                char ch = row.charAt(c);
+                String lbl = (r == 4 && c == 0) ? "SP" : 
+                             (r == 4 && c == 2) ? "<" : String.valueOf(ch);
+                g.drawString(lbl, keyX + keyW/2, rowY + 1, Graphics.TOP | Graphics.HCENTER);
             }
-            return;
         }
-        if (gameAction == Canvas.RIGHT && questionHistory.size() > 0) {
-            if (historyIndex > 0) {
-                historyIndex--;
-                t9Input.setText((String)questionHistory.elementAt(historyIndex));
-                repaint();
-            } else if (historyIndex == 0) {
-                historyIndex = -1;
-                t9Input.clear();
-                repaint();
-            }
-            return;
-        }
-        if (gameAction == Canvas.UP) { 
-            scrollY = Math.max(0, scrollY - lineHeight * 3); 
-            repaint(); 
-            return; 
-        }
-        if (gameAction == Canvas.DOWN) { 
-            scrollY += lineHeight * 3; 
-            repaint(); 
-            return; 
-        }
-        if (gameAction == Canvas.FIRE) { 
-            sendInput(); 
-            return; 
-        }
+    }
+    
+    private void drawSoftkeys(Graphics g) {
+        int y = scrH - softH;
+        g.setColor(Utils.COLOR_ACCENT);
+        g.fillRect(0, y, scrW, softH);
+        g.setColor(Utils.COLOR_BG);
         
-        // Backspace traditionnel (codes clavier émulateur)
-        if (keyCode == -8 || keyCode == -21 || keyCode == -6 || keyCode == -7) {
-            t9Input.backspace();
-            repaint();
-            return;
-        }
+        g.drawString("Menu", 2, y + 1, Graphics.TOP | Graphics.LEFT);
+        String mid = (inputMode == MODE_QWERTY) ? "T9" : "OK";
+        g.drawString(mid, scrW/2, y + 1, Graphics.TOP | Graphics.HCENTER);
+        g.drawString("Del", scrW - 2, y + 1, Graphics.TOP | Graphics.RIGHT);
+    }
+    
+    private void drawMenu(Graphics g) {
+        int menuW = scrW - 16;
+        int menuH = (menuItems.length * (fontH + 3)) + 18;
+        int menuX = 8;
+        int menuY = (scrH - menuH) / 2;
         
-        // Gestion touche # : simple press = CAPS, double press = historique
-        if (keyCode == Canvas.KEY_POUND) {
-            long now = System.currentTimeMillis();
-            if (lastKeyWasHash && (now - lastHashPress) < DOUBLE_PRESS_TIMEOUT) {
-                showHistory();
-                lastKeyWasHash = false;
-                return;
+        g.setColor(0x000000);
+        g.fillRect(menuX + 2, menuY + 2, menuW, menuH);
+        
+        g.setColor(Utils.COLOR_MENU_BG);
+        g.fillRect(menuX, menuY, menuW, menuH);
+        g.setColor(Utils.COLOR_ACCENT);
+        g.drawRect(menuX, menuY, menuW, menuH);
+        
+        g.fillRect(menuX, menuY, menuW, fontH + 4);
+        g.setColor(Utils.COLOR_BG);
+        g.drawString("MENU", menuX + menuW/2, menuY + 2, Graphics.TOP | Graphics.HCENTER);
+        
+        int itemY = menuY + fontH + 6;
+        for (int i = 0; i < menuItems.length; i++) {
+            if (i == menuSelected) {
+                g.setColor(Utils.COLOR_HI);
+                g.fillRect(menuX + 2, itemY - 1, menuW - 4, fontH + 2);
+                g.setColor(Utils.COLOR_ACCENT);
             } else {
-                t9Input.toggleCase();
-                showStatus(t9Input.isUpperCase() ? "CAPS ON" : "caps off");
-                lastKeyWasHash = true;
-                lastHashPress = now;
-                repaint();
-                return;
+                g.setColor(Utils.COLOR_TEXT);
             }
+            g.drawString(menuItems[i], menuX + 6, itemY, Graphics.TOP | Graphics.LEFT);
+            itemY += fontH + 3;
         }
-        lastKeyWasHash = false;
-        
-        // Touche * : symboles COMPLETS
-        if (keyCode == Canvas.KEY_STAR) {
-            handleStarTap();
-            repaint();
-            return;
-        }
-        
-        // Saisie directe ASCII (clavier PC/émulateur)
-        if (keyCode >= 32 && keyCode <= 126) {
-            char c = (char) keyCode;
-            t9Input.flush();
-            t9Input.setText(t9Input.getText() + c);
-            historyIndex = -1;
-            repaint();
-            return;
-        }
-    }
-
-    private void handleStarTap() {
-        if (lastKey != Canvas.KEY_STAR) {
-            lastSymbolPos = t9Input.getText().length();
-            t9Input.setText(t9Input.getText() + SYMBOLS[0]);
-            starTapCount = 0;
-        } else {
-            String current = t9Input.getText();
-            if (lastSymbolPos >= 0 && lastSymbolPos <= current.length()) {
-                t9Input.setText(current.substring(0, lastSymbolPos));
-                starTapCount = (starTapCount + 1) % SYMBOLS.length;
-                t9Input.setText(t9Input.getText() + SYMBOLS[starTapCount]);
-            }
-        }
-        lastKey = Canvas.KEY_STAR;
-        resetStarTimer();
     }
     
-    private void resetStarTimer() {
-        if (starTimer != null) starTimer.cancel();
-        starTimer = new Timer();
-        starTimer.schedule(new TimerTask() {
-            public void run() {
-                lastKey = -1;
-                lastSymbolPos = -1;
-                starTimer = null;
-            }
-        }, 800);
+    protected void keyPressed(int keyCode) {
+        if (showMenu) {
+            handleMenuKey(keyCode);
+        } else if (inputMode == MODE_QWERTY) {
+            handleQwertyKey(keyCode);
+        } else {
+            handleT9Key(keyCode);
+        }
+        repaint();
     }
-
-    private void showHistory() {
-        String historyText = extractRecentHistory(15);
-        final TextBox historyBox = new TextBox("Conversation History", historyText, 1000, TextField.UNEDITABLE);
-        historyBox.addCommand(new Command("Back", Command.BACK, 1));
-        historyBox.setCommandListener(new CommandListener() {
+    
+    private void handleMenuKey(int keyCode) {
+        int action = getGameAction(keyCode);
+        
+        if (action == UP) {
+            menuSelected = (menuSelected - 1 + menuItems.length) % menuItems.length;
+        } else if (action == DOWN) {
+            menuSelected = (menuSelected + 1) % menuItems.length;
+        } else if (action == FIRE || keyCode == -6 || keyCode == -21) {
+            execMenu();
+        } else if (keyCode == -7 || keyCode == -22) {
+            showMenu = false;
+        }
+    }
+    
+    private void execMenu() {
+        showMenu = false;
+        switch (menuSelected) {
+            case 0: sendMessage(); break;
+            case 1: webSearch(); break;
+            case 2: clearChat(); break;
+            case 3: showSaveDialog(); break;  // ← Updated
+            case 4: newChat(); break;
+            case 5: midlet.showMenu(); break;
+        }
+    }
+    
+    private void handleT9Key(int keyCode) {
+        if (keyCode == Canvas.KEY_NUM0) { t9.keyPressed(0); return; }
+        if (keyCode == Canvas.KEY_NUM1) { t9.keyPressed(1); return; }
+        if (keyCode == Canvas.KEY_NUM2) { t9.keyPressed(2); return; }
+        if (keyCode == Canvas.KEY_NUM3) { t9.keyPressed(3); return; }
+        if (keyCode == Canvas.KEY_NUM4) { t9.keyPressed(4); return; }
+        if (keyCode == Canvas.KEY_NUM5) { t9.keyPressed(5); return; }
+        if (keyCode == Canvas.KEY_NUM6) { t9.keyPressed(6); return; }
+        if (keyCode == Canvas.KEY_NUM7) { t9.keyPressed(7); return; }
+        if (keyCode == Canvas.KEY_NUM8) { t9.keyPressed(8); return; }
+        if (keyCode == Canvas.KEY_NUM9) { t9.keyPressed(9); return; }
+        
+        if (keyCode == Canvas.KEY_POUND) {
+            t9.toggleCase();
+            return;
+        }
+        
+        if (keyCode == Canvas.KEY_STAR) {
+            long now = System.currentTimeMillis();
+            if (now - lastNavTime < 400) {
+                inputMode = MODE_QWERTY;
+                qwertyRow = 1;
+                qwertyCol = 0;
+            } else {
+                t9.toggleNumericMode();
+            }
+            lastNavTime = now;
+            return;
+        }
+        
+        int action = getGameAction(keyCode);
+        
+        if (action == UP) {
+            t9.flush();
+            scrollOffset = Math.max(0, scrollOffset - 30);
+            return;
+        }
+        if (action == DOWN) {
+            t9.flush();
+            scrollOffset = Math.min(maxScroll, scrollOffset + 30);
+            return;
+        }
+        
+        if (action == FIRE) {
+            t9.flush();
+            sendMessage();
+            return;
+        }
+        
+        if (action == LEFT) {
+            String h = t9.historyUp();
+            if (h != null) t9.setText(h);
+            return;
+        }
+        
+        if (action == RIGHT) {
+            String h = t9.historyDown();
+            if (h != null) t9.setText(h);
+            return;
+        }
+        
+        if (keyCode == -6 || keyCode == -21) {
+            t9.flush();
+            showMenu = true;
+            menuSelected = 0;
+            return;
+        }
+        
+        if (keyCode == -7 || keyCode == -22) {
+            t9.backspace();
+            return;
+        }
+    }
+    
+    private void handleQwertyKey(int keyCode) {
+        if (keyCode == Canvas.KEY_STAR) {
+            inputMode = MODE_T9;
+            return;
+        }
+        
+        if (keyCode == Canvas.KEY_POUND) {
+            qwertyShift = !qwertyShift;
+            return;
+        }
+        
+        if (keyCode == -6 || keyCode == -21) {
+            showMenu = true;
+            menuSelected = 0;
+            return;
+        }
+        
+        if (keyCode == -7 || keyCode == -22) {
+            t9.backspace();
+            return;
+        }
+        
+        if (keyCode >= Canvas.KEY_NUM0 && keyCode <= Canvas.KEY_NUM9) {
+            inputMode = MODE_T9;
+            t9.keyPressed(keyCode - Canvas.KEY_NUM0);
+            return;
+        }
+        
+        int action = getGameAction(keyCode);
+        
+        if (action == UP) {
+            qwertyRow = (qwertyRow - 1 + QWERTY_ROWS.length) % QWERTY_ROWS.length;
+            fixQwertyCol();
+            return;
+        }
+        if (action == DOWN) {
+            qwertyRow = (qwertyRow + 1) % QWERTY_ROWS.length;
+            fixQwertyCol();
+            return;
+        }
+        if (action == LEFT) {
+            qwertyCol = (qwertyCol - 1 + QWERTY_ROWS[qwertyRow].length()) % QWERTY_ROWS[qwertyRow].length();
+            return;
+        }
+        if (action == RIGHT) {
+            qwertyCol = (qwertyCol + 1) % QWERTY_ROWS[qwertyRow].length();
+            return;
+        }
+        
+        if (action == FIRE) {
+            selectQwertyChar();
+            return;
+        }
+    }
+    
+    private void fixQwertyCol() {
+        if (qwertyCol >= QWERTY_ROWS[qwertyRow].length()) {
+            qwertyCol = QWERTY_ROWS[qwertyRow].length() - 1;
+        }
+    }
+    
+    private void selectQwertyChar() {
+        String row = QWERTY_ROWS[qwertyRow];
+        if (qwertyShift && qwertyRow >= 1 && qwertyRow <= 3) {
+            row = row.toUpperCase();
+        }
+        
+        if (qwertyRow == 4) {
+            if (qwertyCol == 0) {
+                t9.setText(t9.getLiveText() + " ");
+            } else if (qwertyCol == 1) {
+                t9.setText(t9.getLiveText() + ".");
+            } else if (qwertyCol == 2) {
+                t9.backspace();
+            }
+        } else {
+            char c = row.charAt(qwertyCol);
+            t9.setText(t9.getLiveText() + c);
+        }
+    }
+    
+    /**
+     * ENHANCED SAVE DIALOG with Format + Location selection
+     */
+    private void showSaveDialog() {
+        final List saveList = new List("Sauvegarder", Choice.EXCLUSIVE);
+        
+        // Format options
+        saveList.append("--- Format ---", null);
+        saveList.append("Format TXT", null);
+        saveList.append("Format PNG", null);
+        saveList.append("Format RMS/DAT", null);
+        
+        // Separator
+        saveList.append("--- Emplacement ---", null);
+        
+        // Available locations
+        String[] locations = midlet.getSaveManager().getAvailableLocations();
+        for (int i = 0; i < locations.length; i++) {
+            saveList.append(locations[i], null);
+        }
+        
+        saveList.addCommand(new Command("OK", Command.OK, 1));
+        saveList.addCommand(new Command("Annuler", Command.BACK, 1));
+        
+        saveList.setCommandListener(new CommandListener() {
             public void commandAction(Command c, Displayable d) {
-                midlet.getDisplay().setCurrent(ChatCanvas.this);
+                if (c.getCommandType() == Command.OK) {
+                    int selected = saveList.getSelectedIndex();
+                    
+                    // Determine format
+                    String format = "txt";
+                    if (selected == 2) format = "png";
+                    else if (selected == 3) format = "rms";
+                    
+                    // Determine location (if selected)
+                    String[] locs = midlet.getSaveManager().getAvailableLocations();
+                    if (selected > 4 && selected < 5 + locs.length) {
+                        int locIdx = selected - 5;
+                        if (!locs[locIdx].equals("RMS (Internal)")) {
+                            midlet.getSaveManager().setSavePath(locs[locIdx]);
+                        }
+                    }
+                    
+                    // Save
+                    String content = midlet.getHistory().getAllConversationsAsString();
+                    boolean success = midlet.getSaveManager().saveConversation(
+                        content, format, midlet.getUserId());
+                    
+                    // Feedback
+                    String msg = success ? 
+                        "Sauvegarde OK!\n" + midlet.getSaveManager().getSavePath() :
+                        "Erreur de sauvegarde!";
+                    
+                    addMessage(false, msg);
+                    
+                    midlet.getDisplay().setCurrent(ChatCanvas.this);
+                } else {
+                    midlet.getDisplay().setCurrent(ChatCanvas.this);
+                }
             }
         });
-        midlet.getDisplay().setCurrent(historyBox);
+        
+        midlet.getDisplay().setCurrent(saveList);
     }
     
-    private String extractRecentHistory(int maxLines) {
-        if (chatHistory.length() == 0) return "No history yet";
-        StringBuffer result = new StringBuffer();
-        int count = 0;
-        int pos = chatHistory.length() - 1;
-        
-        while (pos >= 0 && count < maxLines) {
-            int lineStart = pos;
-            while (lineStart > 0 && chatHistory.charAt(lineStart - 1) != '\n') lineStart--;
-            
-            if (lineStart <= pos) {
-                for (int i = lineStart; i <= pos; i++) result.insert(0, chatHistory.charAt(i));
-                result.insert(0, '\n');
-                count++;
-            }
-            pos = lineStart - 2;
-            if (pos < 0) break;
-        }
-        
-        if (result.length() > 0 && result.charAt(0) == '\n') result.deleteCharAt(0);
-        return result.toString();
+    private void addMessage(boolean isUser, String text) {
+        String[] msg = new String[2];
+        msg[0] = isUser ? "USER" : "AI";
+        msg[1] = text;
+        messages.addElement(msg);
+        scrollOffset = Integer.MAX_VALUE;
     }
-
-    public void sendInput() {
-        long now = System.currentTimeMillis();
-        if (now - lastSendTime < 1500) { showStatus("Slow down!"); return; }
-        lastSendTime = now;
+    
+    private void sendMessage() {
+        final String userMsg = t9.getLiveText().trim();
+        if (userMsg.length() == 0) return;
         
-        t9Input.flush();
-        final String input = t9Input.getText().trim();
-        if (input.length() == 0) return;
+        t9.addToHistory(userMsg);
+        t9.clear();
+        addMessage(true, userMsg);
+        midlet.getHistory().addUserMessage(userMsg);
         
-        if (input.startsWith("/image ")) {
-            handleImageCommand(input.substring(7).trim());
-            t9Input.clear();
-            return;
-        }
-        
-        if (questionHistory.size() == 0 || !((String)questionHistory.elementAt(0)).equals(input)) {
-            questionHistory.insertElementAt(input, 0);
-            if (questionHistory.size() > 10) questionHistory.setElementAt(null, 10);
-        }
-        historyIndex = -1;
-        
-        appendToChat(midlet.getUserName() + ": " + input + "\n");
-        t9Input.clear();
-        
-        try { Display.getDisplay(midlet).vibrate(80); } catch (Exception e) {}
-        
-        if (!midlet.isNetworkAvailable() || indexOf(input.toLowerCase(), "help", 0) != -1 || 
-            indexOf(input.toLowerCase(), "hello", 0) != -1 || indexOf(input.toLowerCase(), "hi ", 0) != -1) {
-            String offlineResp = midlet.getOfflineResponse(input);
-            if (offlineResp != null) {
-                appendToChat("Grok: [Offline]\n" + offlineResp + "\n\n");
-                return;
-            }
-        }
-        
-        midlet.setWaiting(true);
+        isLoading = true;
         repaint();
         
         new Thread(new Runnable() {
-            public void run() { sendRequest(input); }
+            public void run() {
+                String ctx = "";
+                if (midlet.getSettings().isContextEnabled()) {
+                    ctx = midlet.getHistory().getContext(midlet.getSettings().getMaxContext());
+                }
+                
+                String resp = Utils.sendAIRequest(userMsg, ctx, midlet.getSettings());
+                addMessage(false, resp);
+                midlet.getHistory().addAIMessage(resp);
+                isLoading = false;
+                repaint();
+            }
         }).start();
     }
     
-    private int indexOf(String s, String target, int fromIndex) {
-        if (fromIndex < 0) fromIndex = 0;
-        int max = s.length() - target.length();
-        if (max < 0) return -1;
-        char first = target.charAt(0);
-        for (int i = fromIndex; i <= max; i++) {
-            if (s.charAt(i) == first) {
-                int j = 1;
-                while (j < target.length() && s.charAt(i+j) == target.charAt(j)) j++;
-                if (j == target.length()) return i;
-            }
-        }
-        return -1;
-    }
-
-    private void handleImageCommand(final String prompt) {
-        if (prompt.length() == 0) {
-            appendToChat(midlet.getUserName() + ": /image\n");
-            appendToChat("Grok: Usage: /image <description>\nExamples: robot, heart, star, house, tree\n\n");
-            return;
-        }
+    private void webSearch() {
+        final String q = t9.getLiveText().trim();
+        if (q.length() == 0) return;
         
-        appendToChat(midlet.getUserName() + ": /image " + prompt + "\n");
-        appendToChat("Grok: Generating ASCII art for '" + prompt + "'...\n\n");
-        String localArt = generateSimpleAsciiArt(prompt);
-        appendToChat(localArt + "\n");
+        t9.clear();
+        addMessage(true, "[Web] " + q);
+        isLoading = true;
+        repaint();
         
-        if (midlet.isNetworkAvailable()) {
-            midlet.setWaiting(true);
-            repaint();
-            new Thread(new Runnable() {
-                public void run() { fetchRemoteAsciiArt(prompt); }
-            }).start();
-        } else {
-            appendToChat("Note: Real-time ASCII generation unavailable (no network).\n");
-            appendToChat("J2ME devices cannot display real images due to memory limits.\n\n");
-        }
-    }
-    
-    private String generateSimpleAsciiArt(String prompt) {
-        prompt = prompt.toLowerCase();
-        if (prompt.indexOf("robot") != -1) return "   *****\n  * o o *\n  *  -  *\n   *****\n   |   |\n  /|   |\\\n  /     \\\n";
-        else if (prompt.indexOf("heart") != -1) return "  **   **\n *  * *  *\n*    *    *\n *       *\n  *     *\n   *****\n    ***\n     *\n";
-        else if (prompt.indexOf("star") != -1) return "    .\n   ...\n  ..*..\n .*****.\n  ..*..\n   ...\n    .\n";
-        else if (prompt.indexOf("house") != -1) return "    /\\\n   /  \\\n  /____\\\n  |    |\n  | [] |\n  |____|\n";
-        else if (prompt.indexOf("tree") != -1) return "    *\n   ***\n  *****\n *******\n    |\n    |\n";
-        else if (prompt.indexOf("cat") != -1) return "  /\\_/\\\n ( o.o )\n  > ^ <\n";
-        else if (prompt.indexOf("dog") != -1) return "  / \\__\n (    @\\___\n /         O\n/   (_____/\n/_____/   U\n";
-        else if (prompt.indexOf("car") != -1) return "   __________\n  //  ||  ||\\\n //   ||  || \\\n//___ ||__||__\\\n   O       O\n";
-        else if (prompt.indexOf("smile") != -1) return "  _______\n /       \\\n|  o   o  |\n|    -    |\n|  \\___/  |\n \\_______/\n";
-        else return "   ____\n  /    \\\n |  ?   |\n  \\____/\n   |  |\n   |  |\n";
-    }
-    
-    private void fetchRemoteAsciiArt(final String prompt) {
-        HttpConnection conn = null;
-        InputStream is = null;
-        try {
-            String urlStr = midlet.getAsciiApiUrl() + urlEncode(prompt) + "&width=20&height=10";
-            conn = (HttpConnection) Connector.open(urlStr, Connector.READ, true);
-            conn.setRequestMethod(HttpConnection.GET);
-            conn.setRequestProperty("Connection", "close");
-            conn.setRequestProperty("User-Agent", "J2ME-AIChatBot/1.0");
-            
-            int rc = conn.getResponseCode();
-            if (rc == HttpConnection.HTTP_OK) {
-                is = conn.openInputStream();
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                byte[] buffer = new byte[256];
-                int len, total = 0;
-                long start = System.currentTimeMillis();
-                
-                while ((len = is.read(buffer)) != -1 && total < 2048 && 
-                       (System.currentTimeMillis() - start) < 10000) {
-                    baos.write(buffer, 0, len);
-                    total += len;
-                }
-                
-                final String asciiArt = new String(baos.toByteArray(), "UTF-8");
-                if (asciiArt.indexOf("\n") != -1 && (asciiArt.indexOf("*") != -1 || asciiArt.indexOf("#") != -1)) {
-                    midlet.getDisplay().callSerially(new Runnable() {
-                        public void run() {
-                            appendToChat("\n[Enhanced via API]\n" + asciiArt + "\n\n");
-                            midlet.setWaiting(false);
-                        }
-                    });
-                    return;
-                }
-            }
-        } catch (Exception e) {} finally {
-            try { if (is != null) is.close(); } catch (Exception ignored) {}
-            try { if (conn != null) conn.close(); } catch (Exception ignored) {}
-        }
-        
-        midlet.getDisplay().callSerially(new Runnable() {
+        new Thread(new Runnable() {
             public void run() {
-                appendToChat("Note: Real image generation unavailable on J2ME devices.\n");
-                appendToChat("Memory limits (max 512KB heap) prevent image decoding.\n");
-                appendToChat("ASCII art is the optimal solution for feature phones.\n\n");
-                midlet.setWaiting(false);
+                String resp = Utils.sendAIRequest("Recherche: " + q, "", midlet.getSettings());
+                addMessage(false, resp);
+                midlet.getHistory().addUserMessage("[WEB] " + q);
+                midlet.getHistory().addAIMessage(resp);
+                isLoading = false;
+                repaint();
             }
-        });
+        }).start();
     }
+    
+    private void clearChat() {
+        messages = new Vector();
+        scrollOffset = 0;
+        addMessage(false, "Chat efface.");
+        midlet.getHistory().clearCurrent();
+    }
+    
+    private void newChat() {
+        midlet.getHistory().saveCurrentSession();
+        messages = new Vector();
+        scrollOffset = 0;
+        addMessage(false, "Nouveau chat.");
+    }
+}
 
-    public void appendToChat(String text) {
-        chatHistory.append(text);
-        if (chatHistory.length() > MAX_HISTORY) {
-            int cutPos = -1;
-            int searchStart = MAX_HISTORY / 2;
-            for (int i = searchStart; i < chatHistory.length() - 1; i++) {
-                if (chatHistory.charAt(i) == '\n' && chatHistory.charAt(i+1) == '\n') {
-                    cutPos = i + 2; break;
-                }
-            }
-            if (cutPos == -1) cutPos = searchStart;
-            if (cutPos < chatHistory.length()) {
-                StringBuffer newHist = new StringBuffer();
-                for (int i = cutPos; i < chatHistory.length(); i++) newHist.append(chatHistory.charAt(i));
-                chatHistory = newHist;
-            }
+// Settings Screen with Storage Info
+class SettingsScreen extends Canvas {
+    private AIChatBot midlet;
+    private int selected = 0;
+    private int timeout;
+    private boolean contextEnabled;
+    private int maxContext;
+    private int scrollOffset = 0;
+    
+    public SettingsScreen(AIChatBot midlet) {
+        this.midlet = midlet;
+        setFullScreenMode(true);
+        timeout = midlet.getSettings().getTimeout() / 1000;
+        contextEnabled = midlet.getSettings().isContextEnabled();
+        maxContext = midlet.getSettings().getMaxContext();
+    }
+    
+    protected void paint(Graphics g) {
+        int w = getWidth();
+        int h = getHeight();
+        boolean small = w < 180;
+        Font font = Font.getFont(Font.FACE_MONOSPACE, Font.STYLE_PLAIN, Font.SIZE_SMALL);
+        int fontH = font.getHeight();
+        g.setFont(font);
+        
+        g.setColor(Utils.COLOR_BG);
+        g.fillRect(0, 0, w, h);
+        
+        int headerH = small ? 14 : 20;
+        g.setColor(Utils.COLOR_ACCENT);
+        g.fillRect(0, 0, w, headerH);
+        g.setColor(Utils.COLOR_BG);
+        g.drawString("Parametres", w/2, 2, Graphics.TOP | Graphics.HCENTER);
+        
+        int softH = small ? 12 : 14;
+        int contentY = headerH + 4;
+        int contentH = h - headerH - softH;
+        
+        g.setClip(0, contentY, w, contentH);
+        
+        int y = contentY - scrollOffset;
+        int itemH = fontH + 6;
+        
+        drawItem(g, w, y, 0, "Timeout:", timeout + "s"); y += itemH;
+        drawItem(g, w, y, 1, "Contexte:", contextEnabled ? "OUI" : "NON"); y += itemH;
+        drawItem(g, w, y, 2, "Max ctx:", "" + maxContext); y += itemH + 6;
+        
+        if (selected == 3) {
+            g.setColor(Utils.COLOR_ACCENT);
+            g.fillRoundRect(w/4, y, w/2, fontH + 4, 4, 4);
+            g.setColor(Utils.COLOR_BG);
+        } else {
+            g.setColor(Utils.COLOR_BORDER);
+            g.drawRoundRect(w/4, y, w/2, fontH + 4, 4, 4);
+            g.setColor(Utils.COLOR_TEXT);
         }
-        scrollY = 32767;
+        g.drawString("SAVE", w/2, y + 2, Graphics.TOP | Graphics.HCENTER);
+        y += fontH + 10;
+        
+        // STORAGE INFO
+        g.setColor(Utils.COLOR_BORDER);
+        g.drawLine(8, y, w - 8, y);
+        y += 6;
+        
+        g.setColor(Utils.COLOR_ACCENT);
+        g.drawString("=== STOCKAGE ===", w/2, y, Graphics.TOP | Graphics.HCENTER);
+        y += fontH + 4;
+        
+        g.setColor(Utils.COLOR_TEXT);
+        String storageInfo = midlet.getSaveManager().getStorageInfo();
+        String[] lines = splitLines(storageInfo);
+        for (int i = 0; i < lines.length; i++) {
+            g.drawString(lines[i], 10, y, Graphics.TOP | Graphics.LEFT);
+            y += fontH + 2;
+        }
+        
+        g.setClip(0, 0, w, h);
+        
+        g.setColor(Utils.COLOR_ACCENT);
+        g.fillRect(0, h - softH, w, softH);
+        g.setColor(Utils.COLOR_BG);
+        g.drawString("Back", 2, h - softH + 1, Graphics.TOP | Graphics.LEFT);
+        g.drawString("Scroll: 2/8", w - 2, h - softH + 1, Graphics.TOP | Graphics.RIGHT);
+    }
+    
+    private String[] splitLines(String text) {
+        Vector lines = new Vector();
+        int start = 0;
+        while (start < text.length()) {
+            int end = text.indexOf('\n', start);
+            if (end == -1) {
+                lines.addElement(text.substring(start));
+                break;
+            }
+            lines.addElement(text.substring(start, end));
+            start = end + 1;
+        }
+        
+        String[] result = new String[lines.size()];
+        for (int i = 0; i < lines.size(); i++) {
+            result[i] = (String) lines.elementAt(i);
+        }
+        return result;
+    }
+    
+    private void drawItem(Graphics g, int w, int y, int idx, String lbl, String val) {
+        if (selected == idx) {
+            g.setColor(Utils.COLOR_HI);
+            g.fillRect(4, y - 2, w - 8, 18);
+        }
+        g.setColor(Utils.COLOR_TEXT);
+        g.drawString(lbl, 8, y, Graphics.TOP | Graphics.LEFT);
+        g.setColor(Utils.COLOR_ACCENT);
+        g.drawString("<" + val + ">", w - 8, y, Graphics.TOP | Graphics.RIGHT);
+    }
+    
+    protected void keyPressed(int keyCode) {
+        int action = getGameAction(keyCode);
+        
+        if (action == UP) {
+            if (keyCode == Canvas.KEY_NUM2) {
+                scrollOffset = Math.max(0, scrollOffset - 20);
+            } else {
+                selected = (selected - 1 + 4) % 4;
+            }
+        } else if (action == DOWN) {
+            if (keyCode == Canvas.KEY_NUM8) {
+                scrollOffset += 20;
+            } else {
+                selected = (selected + 1) % 4;
+            }
+        } else if (action == LEFT) {
+            adjust(-1);
+        } else if (action == RIGHT) {
+            adjust(1);
+        } else if (action == FIRE && selected == 3) {
+            save();
+        } else if (keyCode == -6 || keyCode == -21) {
+            midlet.showMenu();
+        }
+        
         repaint();
     }
-
-    private void sendRequest(final String input) {
-        final int MAX_RETRIES = 2;
-        String lastError = "";
-        
-        for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-            final HttpConnection[] connHolder = new HttpConnection[1];
-            InputStream is = null;
-            try {
-                final int timeout = 15000 + (attempt * 5000);
-                String prompt = input + midlet.getInstructions();
-                String urlStr = midlet.getBaseUrl() + urlEncode(prompt);
-                if (midlet.getSession() != null) urlStr += "&session=" + urlEncode(midlet.getSession());
-                
-                connHolder[0] = (HttpConnection) Connector.open(urlStr, Connector.READ, true);
-                connHolder[0].setRequestMethod(HttpConnection.GET);
-                connHolder[0].setRequestProperty("Connection", "close");
-                connHolder[0].setRequestProperty("User-Agent", "J2ME-AIChatBot/1.0");
-                
-                final boolean[] timedOut = {false};
-                Thread watchdog = new Thread(new Runnable() {
-                    public void run() {
-                        try { Thread.sleep(timeout); } catch (Exception e) {}
-                        timedOut[0] = true;
-                        try { if (connHolder[0] != null) connHolder[0].close(); } catch (Exception ex) {}
-                    }
-                });
-                watchdog.start();
-                
-                int rc = connHolder[0].getResponseCode();
-                watchdog.interrupt();
-                
-                if (timedOut[0]) throw new IOException("timeout");
-                if (rc != HttpConnection.HTTP_OK) throw new IOException("HTTP " + rc);
-                
-                is = connHolder[0].openInputStream();
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                byte[] buffer = new byte[256];
-                int len, total = 0;
-                long start = System.currentTimeMillis();
-                
-                while ((len = is.read(buffer)) != -1 && total < 4096 && 
-                       (System.currentTimeMillis() - start) < timeout) {
-                    baos.write(buffer, 0, len);
-                    total += len;
-                }
-                
-                final String response = new String(baos.toByteArray(), "UTF-8");
-                if (indexOf(response, "\"result\"", 0) == -1) throw new IOException("bad json");
-                
-                final String result = extractField(response, "result");
-                final String session = extractField(response, "session");
-                
-                midlet.getDisplay().callSerially(new Runnable() {
-                    public void run() {
-                        midlet.setSession(session);
-                        appendToChat("Grok: " + (result.equals("") ? "Try rephrasing?" : result) + "\n\n");
-                        midlet.setWaiting(false);
-                        midlet.logDebug("Req success, " + response.length() + " bytes");
-                    }
-                });
-                return;
-                
-            } catch (Exception e) {
-                lastError = e.toString().toLowerCase();
-                midlet.logDebug("Req fail attempt " + attempt + ": " + lastError);
-                if (attempt < MAX_RETRIES) try { Thread.sleep(2000); } catch (Exception ex) {}
-            } finally {
-                try { if (is != null) is.close(); } catch (Exception ignored) {}
-                try { if (connHolder[0] != null) connHolder[0].close(); } catch (Exception ignored) {}
-            }
-        }
-        
-        final String userMsg = 
-            indexOf(lastError, "timeout", 0) != -1 ? "Slow network. Shorter questions." :
-            indexOf(lastError, "connect", 0) != -1 ? "No signal. Move near window." :
-            indexOf(lastError, "bad json", 0) != -1 ? "Server error. Try again." :
-            "Server busy. Wait 10s.";
-        
-        midlet.getDisplay().callSerially(new Runnable() {
-            public void run() {
-                appendToChat("Grok: [WARN] " + userMsg + "\n\n");
-                midlet.setWaiting(false);
-            }
-        });
-    }
-
-    private String urlEncode(String s) {
-        if (s == null) return "";
-        StringBuffer sb = new StringBuffer();
-        try {
-            byte[] bytes = s.getBytes("UTF-8");
-            for (int i = 0; i < bytes.length; i++) {
-                int b = bytes[i] & 0xFF;
-                if ((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || 
-                    (b >= '0' && b <= '9') || b == '-' || b == '_' || 
-                    b == '.' || b == '~') sb.append((char) b);
-                else if (b == ' ') sb.append('+');
-                else {
-                    sb.append('%');
-                    sb.append(HEX_DIGITS[(b >> 4) & 0xF]);
-                    sb.append(HEX_DIGITS[b & 0xF]);
-                }
-            }
-        } catch (Exception e) {
-            for (int i = 0; i < s.length(); i++) {
-                char c = s.charAt(i);
-                if (c == ' ') sb.append('+');
-                else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) sb.append(c);
-                else {
-                    sb.append('%');
-                    sb.append(HEX_DIGITS[(c >> 4) & 0xF]);
-                    sb.append(HEX_DIGITS[c & 0xF]);
-                }
-            }
-        }
-        return sb.toString();
-    }
-
-    private String extractField(String json, String field) {
-        if (json == null) return "";
-        String tag = "\"" + field + "\":\"";
-        int start = -1;
-        int tagLen = tag.length();
-        for (int i = 0; i < json.length() - tagLen; i++) {
-            boolean match = true;
-            for (int j = 0; j < tagLen; j++) {
-                if (json.charAt(i + j) != tag.charAt(j)) { match = false; break; }
-            }
-            if (match) { start = i; break; }
-        }
-        if (start == -1) return "";
-        start += tagLen;
-        
-        int end = -1;
-        for (int i = start; i < json.length(); i++) {
-            if (json.charAt(i) == '"') {
-                if (i > start && json.charAt(i-1) != '\\') { end = i; break; }
-            }
-        }
-        if (end == -1) return "";
-        
-        StringBuffer result = new StringBuffer();
-        for (int i = start; i < end; i++) {
-            char c = json.charAt(i);
-            if (c == '\\' && i + 1 < end) {
-                i++;
-                char next = json.charAt(i);
-                if (next == 'n') result.append('\n');
-                else if (next == 'r') result.append('\r');
-                else if (next == 't') result.append('\t');
-                else result.append(next);
-            } else result.append(c);
-        }
-        return result.toString();
-    }
-
-    public void stopTimers() {
-        if (cursorTimer != null) { cursorTimer.cancel(); cursorTimer = null; }
-        if (starTimer != null) { starTimer.cancel(); starTimer = null; }
-        t9Input.flush();
-    }
-
-    public void commandAction(Command c, Displayable d) {
-        if (c == sendCommand && !midlet.isWaitingResponse()) {
-            sendInput();
-        } else if (c == backspaceCommand) {
-            // RSK = Backspace
-            t9Input.backspace();
-            repaint();
-        } else if (c == exitCommand) {
-            midlet.destroyApp(true);
-        }
+    
+    private void adjust(int d) {
+        if (selected == 0) timeout = Math.max(5, Math.min(120, timeout + d * 5));
+        else if (selected == 1) contextEnabled = !contextEnabled;
+        else if (selected == 2) maxContext = Math.max(1, Math.min(20, maxContext + d));
     }
     
-    protected void hideNotify() {
-        if (cursorTimer != null) cursorTimer.cancel();
+    private void save() {
+        midlet.getSettings().setTimeout(timeout * 1000);
+        midlet.getSettings().setContextEnabled(contextEnabled);
+        midlet.getSettings().setMaxContext(maxContext);
+        midlet.showMenu();
+    }
+}
+
+// History Screen (unchanged)
+class HistoryScreen extends Canvas {
+    private AIChatBot midlet;
+    private String[] convs;
+    private int scroll = 0;
+    
+    public HistoryScreen(AIChatBot midlet) {
+        this.midlet = midlet;
+        setFullScreenMode(true);
+        convs = midlet.getHistory().getAllConversations();
     }
     
-    protected void showNotify() {
-        startCursorTimer();
+    protected void paint(Graphics g) {
+        int w = getWidth();
+        int h = getHeight();
+        boolean small = w < 180;
+        Font font = Font.getFont(Font.FACE_MONOSPACE, Font.STYLE_PLAIN, Font.SIZE_SMALL);
+        int fontH = font.getHeight();
+        g.setFont(font);
+        
+        g.setColor(Utils.COLOR_BG);
+        g.fillRect(0, 0, w, h);
+        
+        int headerH = small ? 14 : 20;
+        g.setColor(Utils.COLOR_ACCENT);
+        g.fillRect(0, 0, w, headerH);
+        g.setColor(Utils.COLOR_BG);
+        g.drawString("Historique (" + convs.length + ")", w/2, 2, Graphics.TOP | Graphics.HCENTER);
+        
+        int softH = small ? 12 : 14;
+        g.setClip(0, headerH, w, h - headerH - softH);
+        
+        int y = headerH + 4 - scroll;
+        if (convs.length == 0) {
+            g.setColor(Utils.COLOR_DIM);
+            g.drawString("Vide", w/2, h/2, Graphics.TOP | Graphics.HCENTER);
+        } else {
+            for (int i = 0; i < convs.length; i++) {
+                if (y > headerH - fontH && y < h - softH) {
+                    g.setColor(Utils.COLOR_BORDER);
+                    g.drawLine(4, y, w - 4, y);
+                    g.setColor(Utils.COLOR_TEXT);
+                    String t = convs[i];
+                    if (t.length() > 28) t = t.substring(0, 28) + "..";
+                    g.drawString("[" + (i+1) + "] " + t, 6, y + 2, Graphics.TOP | Graphics.LEFT);
+                }
+                y += fontH + 6;
+            }
+        }
+        
+        g.setClip(0, 0, w, h);
+        g.setColor(Utils.COLOR_ACCENT);
+        g.fillRect(0, h - softH, w, softH);
+        g.setColor(Utils.COLOR_BG);
+        g.drawString("Back", 2, h - softH + 1, Graphics.TOP | Graphics.LEFT);
+    }
+    
+    protected void keyPressed(int keyCode) {
+        int action = getGameAction(keyCode);
+        if (action == UP) scroll = Math.max(0, scroll - 25);
+        else if (action == DOWN) scroll += 25;
+        else if (keyCode == -6 || keyCode == -21) midlet.showMenu();
+        repaint();
+    }
+}
+
+// About Screen (unchanged)
+class AboutScreen extends Canvas {
+    private AIChatBot midlet;
+    
+    public AboutScreen(AIChatBot midlet) {
+        this.midlet = midlet;
+        setFullScreenMode(true);
+    }
+    
+    protected void paint(Graphics g) {
+        int w = getWidth();
+        int h = getHeight();
+        boolean small = w < 180;
+        Font font = Font.getFont(Font.FACE_MONOSPACE, Font.STYLE_PLAIN, Font.SIZE_SMALL);
+        int fontH = font.getHeight();
+        g.setFont(font);
+        
+        g.setColor(Utils.COLOR_BG);
+        g.fillRect(0, 0, w, h);
+        
+        int headerH = small ? 14 : 20;
+        g.setColor(Utils.COLOR_ACCENT);
+        g.fillRect(0, 0, w, headerH);
+        g.setColor(Utils.COLOR_BG);
+        g.drawString("A propos", w/2, 2, Graphics.TOP | Graphics.HCENTER);
+        
+        int y = headerH + 8;
+        int lh = fontH + 2;
+        
+        g.setColor(Utils.COLOR_ACCENT);
+        g.drawString("AI ChatBot " + AIChatBot.VERSION, w/2, y, Graphics.TOP | Graphics.HCENTER);
+        y += lh * 2;
+        
+        String[] lines = {
+            "=== T9 INPUT ===",
+            "2: a b c 2",
+            "8: t u v 8",
+            "#: Toggle MAJ/min",
+            "*: Mode 123",
+            "**: QWERTY mode",
+            "",
+            "=== NAV ===",
+            "D-pad: Scroll",
+            "Fire: Envoyer",
+            "LSK: Menu",
+            "RSK: Effacer",
+            "",
+            "=== SAVE ===",
+            "JSR-75: " + (midlet.getSaveManager().isFileAPIAvailable() ? "OUI" : "NON"),
+            "",
+            "ID: " + midlet.getUserId()
+        };
+        
+        for (int i = 0; i < lines.length; i++) {
+            if (lines[i].startsWith("===")) {
+                g.setColor(Utils.COLOR_ACCENT);
+            } else {
+                g.setColor(Utils.COLOR_TEXT);
+            }
+            g.drawString(lines[i], w/2, y, Graphics.TOP | Graphics.HCENTER);
+            y += lh;
+        }
+        
+        int softH = small ? 12 : 14;
+        g.setColor(Utils.COLOR_ACCENT);
+        g.fillRect(0, h - softH, w, softH);
+        g.setColor(Utils.COLOR_BG);
+        g.drawString("Back", 2, h - softH + 1, Graphics.TOP | Graphics.LEFT);
+    }
+    
+    protected void keyPressed(int keyCode) {
+        if (keyCode == -6 || keyCode == -21) midlet.showMenu();
     }
 }
