@@ -418,7 +418,7 @@ public class SaveManager {
                 return new String(data, "UTF-8");
             }
         } catch (Exception e) {
-            return "[Erreur: " + e.getMessage() + "]";
+            return "[Error: " + e.getMessage() + "]";
         } finally {
             closeRS(rs);
         }
@@ -529,19 +529,19 @@ public class SaveManager {
                 long avail = fc.availableSize();
                 long used = total - avail;
                 
-                info.append("Stockage: ").append(defaultSavePath).append("\n");
+                info.append("Path: ").append(defaultSavePath).append("\n");
                 info.append("Total: ").append(total / 1024).append(" KB\n");
-                info.append("Utilise: ").append(used / 1024).append(" KB\n");
-                info.append("Libre: ").append(avail / 1024).append(" KB\n");
+                info.append("Used: ").append(used / 1024).append(" KB\n");
+                info.append("Free: ").append(avail / 1024).append(" KB\n");
                 
             } catch (Exception e) {
-                info.append("Erreur lecture stockage\n");
+                info.append("Storage read error\n");
             } finally {
                 try { if (fc != null) fc.close(); } catch (Exception e) {}
             }
         } else {
-            info.append("Mode: RMS uniquement\n");
-            info.append("Stockage: Memoire interne\n");
+            info.append("Mode: RMS only\n");
+            info.append("Path: Internal memory\n");
         }
         
         return info.toString();
