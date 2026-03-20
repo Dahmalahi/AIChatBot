@@ -819,7 +819,7 @@ class ChatCanvas extends Canvas implements Runnable {
     private boolean showQuick = true;
     private int     quickSel  = 0;  // selected quick reply chip index
 
-    private static final String API   = "https://api-dl-j2meuploader.ndukadavid70.workers.dev/api/ai/chatgpt?text=";
+    private static final String API   = "http://api-dl-j2meuploader.ndukadavid70.workers.dev/api/ai/chatgpt?text=";
     private static final String PROXY = "http://nnp.nnchan.ru/glype/browse.php?u=";
 
     public ChatCanvas(AIChatBot midlet, String name, String lang, String role) {

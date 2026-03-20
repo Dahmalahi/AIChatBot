@@ -26,7 +26,7 @@ public class Utils {
 
     // ---- API ----
     private static final String API_URL =
-        "https://api-dl-j2meuploader.ndukadavid70.workers.dev/api/ai/chatgpt?text=";
+        "http://api-dl-j2meuploader.ndukadavid70.workers.dev/api/ai/chatgpt?text=";
     private static final String PROXY_PREFIX =
         "http://nnp.nnchan.ru/glype/browse.php?u=";
 
